@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 // Load Firebase Admin credentials
-const serviceAccount = JSON.parse(readFileSync('./telemedical-projeect.json', 'utf8'));
+const serviceAccount = JSON.parse(readFileSync(ggggg, 'utf8'));
 
 initializeApp({
   credential: cert(serviceAccount),
