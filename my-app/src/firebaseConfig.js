@@ -4,7 +4,8 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore } from "firebase/firestore"; // Import Firestore
-
+import { getStorage } from "firebase/storage";
+import { getAuth } from 'firebase/auth';
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAAtT8APXrA2yvehNbvzVDxs6W0gjvIOu8",
@@ -16,9 +17,12 @@ const firebaseConfig = {
   measurementId: "G-SEFCKP3S5L"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
-const db = getFirestore(app); // Initialize Firestore
 
-export { db }; // Export db as a named export
+const db = getFirestore(app);
+const storage = getStorage(app); // ✅ Initialize Firebase Storage
+
+const auth = getAuth(app);
+
+export { db, storage, auth }; // ✅ Export both db and storage

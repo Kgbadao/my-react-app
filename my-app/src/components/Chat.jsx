@@ -1,84 +1,145 @@
-import React, { useState, useEffect } from 'react';
+// src/components/Chat.jsx
+
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  addDoc,
-  serverTimestamp,
+  doc, onSnapshot, updateDoc, addDoc, collection,
+  serverTimestamp, getDoc
 } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
+import { db, auth } from '../firebaseConfig';
+import { useParams } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
 
 function Chat() {
+  const { roomId } = useParams();
   const [messages, setMessages] = useState([]);
+  const [room, setRoom] = useState(null);
   const [newMessage, setNewMessage] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const typingTimeoutRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
-  // Set up a listener for messages in the "messages" collection ordered by creation time
   useEffect(() => {
-    const messagesQuery = query(
-      collection(db, 'messages'),
-      orderBy('createdAt', 'asc')
-    );
-
-    const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-      const messagesArray = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setMessages(messagesArray);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setCurrentUser(user);
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setUserRole(userDoc.data().role);
+        }
+      }
     });
-
-    // Clean up the listener when the component unmounts
     return () => unsubscribe();
   }, []);
 
-  // Handler for submitting a new message
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (newMessage.trim() === '') return;
+  useEffect(() => {
+    if (!roomId) return;
+    const roomRef = doc(db, 'chatRooms', roomId);
 
-    try {
-      await addDoc(collection(db, 'messages'), {
-        text: newMessage,
-        createdAt: serverTimestamp(),
-        user: 'Anonymous', // Replace this with authenticated user data if available
-      });
-      setNewMessage('');
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
+    getDoc(roomRef).then(docSnap => {
+      if (docSnap.exists()) {
+        setRoom(docSnap.data());
+      }
+    });
+
+    const messagesRef = collection(roomRef, 'messages');
+    const unsubscribe = onSnapshot(messagesRef, (snapshot) => {
+      const msgs = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => a.createdAt?.seconds - b.createdAt?.seconds);
+      setMessages(msgs);
+    });
+
+    return () => unsubscribe();
+  }, [roomId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !currentUser || !userRole) return;
+
+    const roomRef = doc(db, 'chatRooms', roomId);
+    const messagesRef = collection(roomRef, 'messages');
+
+    await addDoc(messagesRef, {
+      text: newMessage,
+      sender: currentUser.displayName || currentUser.email,
+      senderId: currentUser.uid,
+      senderRole: userRole,
+      createdAt: serverTimestamp(),
+    });
+
+    setNewMessage('');
+    clearTyping(roomRef);
   };
 
-  return (
-    <div className="max-w-md mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Chat Room</h1>
+  const handleTyping = async () => {
+    if (!currentUser) return;
+    const roomRef = doc(db, 'chatRooms', roomId);
+    await updateDoc(roomRef, { typing: currentUser.displayName });
 
-      {/* Chat messages container */}
-      <div className="border rounded p-4 h-80 overflow-y-auto mb-4">
-        {messages.length > 0 ? (
-          messages.map((msg) => (
-            <div key={msg.id} className="mb-2">
-              <strong>{msg.user}: </strong>
-              <span>{msg.text}</span>
-            </div>
-          ))
-        ) : (
-          <p className="text-gray-500">No messages yet.</p>
-        )}
+    clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => clearTyping(roomRef), 1500);
+  };
+
+  const clearTyping = async (roomRef) => {
+    await updateDoc(roomRef, { typing: '' });
+  };
+
+  const renderMessage = (msg) => {
+    const isCurrentUser = msg.senderId === currentUser?.uid;
+    const alignment = isCurrentUser ? 'items-end' : 'items-start';
+    const bubbleColor = isCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-100 text-black';
+    const senderStyle = isCurrentUser ? 'text-blue-700 font-semibold text-xs mb-1' : 'text-gray-600 font-semibold text-xs mb-1';
+
+    return (
+      <div key={msg.id} className={`flex flex-col ${alignment} mb-2`}>
+        <p className={`${senderStyle}`}>{msg.sender}</p>
+        <div className={`rounded-2xl px-4 py-2 max-w-[75%] ${bubbleColor} shadow-sm`}> 
+          <p>{msg.text}</p>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1">
+          {msg.createdAt?.toDate().toLocaleTimeString()}
+        </p>
+      </div>
+    );
+  };
+
+  if (!roomId) {
+    return <div className="text-center mt-10 text-red-600">❌ No chat room ID provided.</div>;
+  }
+
+  return (
+    <div className="flex flex-col h-screen max-w-xl mx-auto bg-white">
+      <div className="px-4 py-3 border-b shadow text-center font-bold text-lg">
+        Chat with {userRole === 'doctor' ? room?.patientName : 'Dr. Smith'}
       </div>
 
-      {/* Message submission form */}
-      <form onSubmit={handleSubmit} className="flex">
+      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 bg-gray-50">
+        {messages.length === 0 ? (
+          <p className="text-gray-400 text-center">No messages yet.</p>
+        ) : (
+          messages.map(renderMessage)
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <form onSubmit={handleSend} className="p-3 border-t flex gap-2 bg-white">
         <input
           type="text"
-          placeholder="Type your message here..."
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          className="flex-grow border rounded-l p-2"
+          onInput={handleTyping}
+          placeholder="Type a message..."
+          className="flex-grow border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
         <button
           type="submit"
-          className="bg-blue-600 text-white px-4 rounded-r transition hover:bg-blue-700"
+          className="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition"
         >
           Send
         </button>

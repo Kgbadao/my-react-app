@@ -47,7 +47,12 @@ button {
 
 /* 🎥 Optimized Video Styling */
 .video-frame {
-  @apply w-full max-w-[300px] rounded-lg shadow-soft opacity-0 transition-opacity duration-1000 ease-in-out;
+  @layer utilities {
+  .shadow-soft {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
 }
 
 /* 🚀 Interactive Navbar Link */

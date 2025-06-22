@@ -1,79 +1,120 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { db } from '../firebaseConfig';
+import { collection, doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
 
 const configuration = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
 };
 
 function VideoCallComponent() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const [peerConnection, setPeerConnection] = useState(null);
+  const callDocRef = doc(collection(db, 'calls'));
 
   useEffect(() => {
     const initMediaAndConnection = async () => {
       try {
-        // Access user's media devices
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        
-        // Display local video stream
+
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
-        
-        // Initialize RTCPeerConnection and add local tracks
+
         const pc = new RTCPeerConnection(configuration);
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
         setPeerConnection(pc);
-  
-        // When a remote track is received, display it
+
         pc.ontrack = (event) => {
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = event.streams[0];
           }
         };
-  
-        // ICE candidate listener – send candidates over your signaling mechanism (e.g., Firebase)
-        pc.onicecandidate = (event) => {
+
+        pc.onicecandidate = async (event) => {
           if (event.candidate) {
-            console.log("New ICE candidate:", event.candidate);
-            // Send the candidate to the remote peer via your signaling server.
+            await setDoc(callDocRef, {
+              iceCandidate: event.candidate.toJSON(),
+            }, { merge: true });
           }
         };
-  
+
       } catch (error) {
-        console.error("Error accessing media devices", error);
+        console.error('Error accessing media devices', error);
       }
     };
 
     initMediaAndConnection();
   }, []);
 
-  // Placeholder functions for offer/answer exchange
   const createOffer = async () => {
     if (!peerConnection) return;
     try {
       const offer = await peerConnection.createOffer();
       await peerConnection.setLocalDescription(offer);
-      console.log("Offer created: ", offer);
-      // TODO: Send this offer to the remote peer via your signaling channel
+      await setDoc(callDocRef, { offer: offer.toJSON() });
+
+      console.log('Offer created: ', offer);
     } catch (error) {
-      console.error("Error creating offer:", error);
+      console.error('Error creating offer:', error);
+    }
+  };
+
+  const createAnswer = async () => {
+    if (!peerConnection) return;
+    try {
+      const callSnap = await getDoc(callDocRef);
+      const callData = callSnap.data();
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(callData.offer));
+
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      await setDoc(callDocRef, { answer: answer.toJSON() }, { merge: true });
+
+      console.log('Answer created: ', answer);
+    } catch (error) {
+      console.error('Error creating answer:', error);
     }
   };
 
   return (
-    <div className="flex flex-col items-center space-y-4">
-      <h1 className="text-2xl font-bold">Video Call</h1>
-      <div className="flex space-x-4">
-        <video ref={localVideoRef} autoPlay muted style={{ width: '300px' }} />
-        <video ref={remoteVideoRef} autoPlay style={{ width: '300px' }} />
+    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6">Live Video Call</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-5xl">
+        <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg">
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            className="w-full h-64 object-cover rounded-lg"
+          />
+          <p className="text-center py-2 bg-gray-900 text-sm">You</p>
+        </div>
+        <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg">
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            className="w-full h-64 object-cover rounded-lg"
+          />
+          <p className="text-center py-2 bg-gray-900 text-sm">Remote</p>
+        </div>
       </div>
-      <button
-        onClick={createOffer}
-        className="bg-blue-600 text-white px-4 py-2 rounded-md transition hover:bg-blue-700"
-      >
-        Create Offer
-      </button>
+
+      <div className="mt-6 space-x-4">
+        <button
+          onClick={createOffer}
+          className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700"
+        >
+          Start Call
+        </button>
+        <button
+          onClick={createAnswer}
+          className="bg-green-600 text-white px-6 py-3 rounded-lg shadow hover:bg-green-700"
+        >
+          Join Call
+        </button>
+      </div>
     </div>
   );
 }
