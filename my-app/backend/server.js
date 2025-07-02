@@ -9,7 +9,7 @@ const app = express();
 const PORT = 5000;
 
 // Firebase Admin Setup
-const serviceAccount = JSON.parse(readFileSync('./telemedical-projeect.json', 'utf8'));
+const serviceAccount = JSON.parse(readFileSync('./telemedical-project.json', 'utf8'));
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
@@ -57,6 +57,58 @@ app.get('/api/appointments', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Add this near your other app.post/app.get handlers
+
+// POST /api/chat/:roomId/messages — add a new chat message
+app.post('/api/chat/:roomId/messages', async (req, res) => {
+  const { roomId } = req.params;
+  const { senderId, senderName, text } = req.body;
+
+  if (!senderId || !text) {
+    return res.status(400).json({ message: 'Missing senderId or text' });
+  }
+
+  try {
+    const messagesRef = db
+      .collection('chatRooms')
+      .doc(roomId)
+      .collection('messages');
+
+    await messagesRef.add({
+      senderId,
+      senderName,
+      text,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.status(201).json({ message: 'Message sent successfully' });
+  } catch (error) {
+    console.error('Error adding message:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET /api/chat/:roomId/messages — get all messages for a chat room
+app.get('/api/chat/:roomId/messages', async (req, res) => {
+  const { roomId } = req.params;
+
+  try {
+    const messagesRef = db
+      .collection('chatRooms')
+      .doc(roomId)
+      .collection('messages');
+
+    const snapshot = await messagesRef.orderBy('createdAt').get();
+    const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    res.status(200).json(messages);
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 
 // 🔐 Register New User
 app.post('/api/auth/register', async (req, res) => {

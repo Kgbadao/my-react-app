@@ -51,7 +51,7 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-indigo-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white/60 backdrop-blur-md border border-white/20 shadow-xl rounded-2xl p-8">
         <h2 className="text-3xl font-bold text-center text-indigo-700 mb-6">Register for TeleMed</h2>
-mo
+
         {/* Manual Registration */}
         <form className="space-y-4" onSubmit={handleFormSubmit}>
           <input

@@ -1,20 +1,25 @@
-// src/components/AppointmentForm.jsx
-
 import React, { useState } from 'react';
 import axios from 'axios';
+
+const doctors = [
+  { id: 'doc1', name: 'Dr. Smith' },
+  { id: 'doc2', name: 'Dr. Johnson' },
+  { id: 'doc3', name: 'Dr. Lee' },
+  // Add more doctors as needed with their IDs
+];
 
 const AppointmentForm = () => {
   const [formDate, setFormDate] = useState('');
   const [formTime, setFormTime] = useState('');
-  const [formDoctor, setFormDoctor] = useState('');
-  const [userId] = useState('user123');
+  const [formDoctorId, setFormDoctorId] = useState('');
+  const [userId] = useState('user123'); // replace with real logged-in user ID later
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formDate || !formTime || !formDoctor) {
+    if (!formDate || !formTime || !formDoctorId) {
       setMessage('Please fill all fields');
       return;
     }
@@ -22,8 +27,8 @@ const AppointmentForm = () => {
     const appointmentData = {
       date: formDate,
       time: formTime,
-      doctor: formDoctor,
-      userId,
+      doctorId: formDoctorId,
+      patientId: userId,
     };
 
     try {
@@ -35,7 +40,7 @@ const AppointmentForm = () => {
         params: {
           date: formDate,
           time: formTime,
-          doctor: formDoctor,
+          doctorId: formDoctorId,
         },
       });
 
@@ -49,7 +54,7 @@ const AppointmentForm = () => {
       setMessage('✅ Appointment created successfully!');
       setFormDate('');
       setFormTime('');
-      setFormDoctor('');
+      setFormDoctorId('');
     } catch (error) {
       console.error(error);
       setMessage('❌ ' + (error.response?.data?.message || 'Error creating appointment'));
@@ -86,23 +91,28 @@ const AppointmentForm = () => {
 
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">Doctor</label>
-          <input
-            type="text"
-            value={formDoctor}
-            onChange={(e) => setFormDoctor(e.target.value)}
-            placeholder="Dr. Smith"
+          <select
+            value={formDoctorId}
+            onChange={(e) => setFormDoctorId(e.target.value)}
             className="w-full px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
             required
-          />
+          >
+            <option value="" disabled>
+              Select a doctor
+            </option>
+            {doctors.map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         <button
           type="submit"
           disabled={loading}
           className={`w-full py-2 text-white font-medium rounded-lg transition ${
-            loading
-              ? 'bg-indigo-300 cursor-not-allowed'
-              : 'bg-indigo-600 hover:bg-indigo-700'
+            loading ? 'bg-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
           }`}
         >
           {loading ? 'Creating...' : 'Create Appointment'}

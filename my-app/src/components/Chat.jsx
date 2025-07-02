@@ -1,145 +1,133 @@
-// src/components/Chat.jsx
-
-import React, { useEffect, useRef, useState } from 'react';
-import {
-  doc, onSnapshot, updateDoc, addDoc, collection,
-  serverTimestamp, getDoc
-} from 'firebase/firestore';
-import { db, auth } from '../firebaseConfig';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
 
 function Chat() {
   const { roomId } = useParams();
+  const chatRoomId = roomId || "Welcome";
+
   const [messages, setMessages] = useState([]);
-  const [room, setRoom] = useState(null);
   const [newMessage, setNewMessage] = useState('');
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userRole, setUserRole] = useState(null);
-  const typingTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
 
+  // Load user info from localStorage (adjust keys if needed)
+  const user = JSON.parse(localStorage.getItem('user')) || null;
+
+  // Fetch messages from backend
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setCurrentUser(user);
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setUserRole(userDoc.data().role);
+    if (!chatRoomId) return;
+
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/chat/${chatRoomId}/messages`);
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(data);
+          scrollToBottom();
         }
+      } catch (error) {
+        console.error('Failed to fetch messages:', error);
       }
-    });
-    return () => unsubscribe();
-  }, []);
+    };
 
-  useEffect(() => {
-    if (!roomId) return;
-    const roomRef = doc(db, 'chatRooms', roomId);
+    fetchMessages();
 
-    getDoc(roomRef).then(docSnap => {
-      if (docSnap.exists()) {
-        setRoom(docSnap.data());
-      }
-    });
+    // Poll every 5 seconds
+    const interval = setInterval(fetchMessages, 5000);
 
-    const messagesRef = collection(roomRef, 'messages');
-    const unsubscribe = onSnapshot(messagesRef, (snapshot) => {
-      const msgs = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .sort((a, b) => a.createdAt?.seconds - b.createdAt?.seconds);
-      setMessages(msgs);
-    });
+    return () => clearInterval(interval);
+  }, [chatRoomId]);
 
-    return () => unsubscribe();
-  }, [roomId]);
-
-  useEffect(() => {
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  };
 
+  // Send new message
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !currentUser || !userRole) return;
 
-    const roomRef = doc(db, 'chatRooms', roomId);
-    const messagesRef = collection(roomRef, 'messages');
+    if (!newMessage.trim()) return;
 
-    await addDoc(messagesRef, {
-      text: newMessage,
-      sender: currentUser.displayName || currentUser.email,
-      senderId: currentUser.uid,
-      senderRole: userRole,
-      createdAt: serverTimestamp(),
-    });
+    if (!user) {
+      alert('You must be logged in to send messages.');
+      return;
+    }
 
-    setNewMessage('');
-    clearTyping(roomRef);
+    try {
+      const res = await fetch(`http://localhost:5000/api/chat/${chatRoomId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderId: user.id || user.email,
+          senderName: user.name || user.email || 'Unknown',
+          text: newMessage.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        setNewMessage('');
+        // Optionally fetch messages immediately after sending
+        const updatedMessages = await res.json();
+        // Or just wait for the polling to update messages
+      } else {
+        alert('Failed to send message.');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
   };
-
-  const handleTyping = async () => {
-    if (!currentUser) return;
-    const roomRef = doc(db, 'chatRooms', roomId);
-    await updateDoc(roomRef, { typing: currentUser.displayName });
-
-    clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => clearTyping(roomRef), 1500);
-  };
-
-  const clearTyping = async (roomRef) => {
-    await updateDoc(roomRef, { typing: '' });
-  };
-
-  const renderMessage = (msg) => {
-    const isCurrentUser = msg.senderId === currentUser?.uid;
-    const alignment = isCurrentUser ? 'items-end' : 'items-start';
-    const bubbleColor = isCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-100 text-black';
-    const senderStyle = isCurrentUser ? 'text-blue-700 font-semibold text-xs mb-1' : 'text-gray-600 font-semibold text-xs mb-1';
-
-    return (
-      <div key={msg.id} className={`flex flex-col ${alignment} mb-2`}>
-        <p className={`${senderStyle}`}>{msg.sender}</p>
-        <div className={`rounded-2xl px-4 py-2 max-w-[75%] ${bubbleColor} shadow-sm`}> 
-          <p>{msg.text}</p>
-        </div>
-        <p className="text-[10px] text-gray-400 mt-1">
-          {msg.createdAt?.toDate().toLocaleTimeString()}
-        </p>
-      </div>
-    );
-  };
-
-  if (!roomId) {
-    return <div className="text-center mt-10 text-red-600">❌ No chat room ID provided.</div>;
-  }
 
   return (
-    <div className="flex flex-col h-screen max-w-xl mx-auto bg-white">
-      <div className="px-4 py-3 border-b shadow text-center font-bold text-lg">
-        Chat with {userRole === 'doctor' ? room?.patientName : 'Dr. Smith'}
-      </div>
+    <div className="max-w-xl mx-auto flex flex-col h-screen bg-white shadow-md rounded-md p-4">
+      <header className="text-center font-bold text-xl mb-4 border-b pb-2">
+        Chat Room: {chatRoomId}
+      </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-2 bg-gray-50">
+      <div
+        className="flex-1 overflow-y-auto mb-4 px-2"
+        style={{ maxHeight: '70vh' }}
+      >
         {messages.length === 0 ? (
-          <p className="text-gray-400 text-center">No messages yet.</p>
+          <p className="text-gray-500 text-center mt-10">No messages yet.</p>
         ) : (
-          messages.map(renderMessage)
+          messages.map((msg) => {
+            const isOwnMessage = msg.senderId === (user?.id || user?.email);
+            return (
+              <div
+                key={msg.id}
+                className={`mb-3 flex flex-col ${
+                  isOwnMessage ? 'items-end' : 'items-start'
+                }`}
+              >
+                <div
+                  className={`rounded-lg px-4 py-2 max-w-[75%] ${
+                    isOwnMessage ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-900'
+                  } shadow`}
+                >
+                  <p className="text-sm font-semibold">{msg.senderName}</p>
+                  <p>{msg.text}</p>
+                </div>
+                <span className="text-xs text-gray-400 mt-1">
+                  {new Date(msg.createdAt).toLocaleTimeString()}
+                </span>
+              </div>
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSend} className="p-3 border-t flex gap-2 bg-white">
+      <form onSubmit={handleSend} className="flex gap-2">
         <input
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          onInput={handleTyping}
           placeholder="Type a message..."
-          className="flex-grow border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="flex-grow border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
         <button
           type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition"
+          disabled={!newMessage.trim()}
+          className="bg-blue-600 text-white px-5 py-2 rounded-full disabled:opacity-50 hover:bg-blue-700 transition"
         >
           Send
         </button>
