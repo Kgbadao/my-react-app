@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { AlertCircle, Loader } from 'lucide-react';
 
+// Add this line at the top
+const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
+
 function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,7 +25,8 @@ function LoginPage() {
         ? { name, email, password }
         : { email, password };
 
-      const res = await fetch(`http://localhost:5000${endpoint}`, {
+      // CHANGED: Use API_URL instead of localhost
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -66,7 +70,8 @@ function LoginPage() {
 
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/auth/google', {
+      // CHANGED: Use API_URL instead of localhost
+      const res = await fetch(`${API_URL}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

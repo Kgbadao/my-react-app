@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
+
 export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState(null);
@@ -13,7 +15,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await axios.post('http://localhost:5000/api/auth/register', form);
+      await axios.post(`${API_URL}/api/auth/register`, form);
       alert('Registered successfully. Please login.');
       window.location.href = '/login';
     } catch (err) {
@@ -24,12 +26,12 @@ export default function RegisterPage() {
   };
 
   const handleGoogleSuccess = (credentialResponse) => {
-  if (!credentialResponse?.credential) {
+    if (!credentialResponse?.credential) {
       setError('Google credential missing');
       return;
     }
 
-    fetch('/auth/google', {
+    fetch(`${API_URL}/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

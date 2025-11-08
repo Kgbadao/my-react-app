@@ -61,7 +61,7 @@ const auth = getAuth();
 app.use(helmet());
 app.use(cors({ 
   origin: ['http://localhost:5173', 'http://localhost:3000',
-    process.env.FRONTEND_URL || 'https://my-react-l17monvi0-khadijahs-projects-5afec56d.vercel.app',
+    process.env.FRONTEND_URL || 'https://my-react-py2zfiggv-khadijahs-projects-5afec56d.vercel.app/',
   ], 
   credentials: true 
 }));
