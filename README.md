@@ -24,14 +24,14 @@ cd my-react-app
 
 # Install dependencies
 npm install
-
 # Set up Firebase credentials
 # Create a .env file with your Firebase config
 # REACT_APP_FIREBASE_API_KEY=your_key
 # REACT_APP_FIREBASE_PROJECT_ID=your_id
 # etc.
-
 # Start the development server
+
+
 npm start
 💡 What I Learned
 This project taught me how to build end-to-end full-stack applications with real-time features. I gained hands-on experience with WebRTC for peer-to-peer communication, Firebase backend services, and managing complex state in React applications. It strengthened my understanding of secure authentication, API design, and building scalable backend services with Node.js.
