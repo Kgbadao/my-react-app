@@ -7,7 +7,7 @@ User Authentication — Secure login with Firebase Authentication
 Real-time Video Consultations — Peer-to-peer video calls using WebRTC
 Appointment Scheduling — Book and manage consultations
 User Profiles — Patient and provider information management
-Secure Data Management — Firebase Firestore for HIPAA-compliant data storage
+Secure Data Management — Firebase Firestore for secure data storage
 
 Tech Stack
 
@@ -19,8 +19,8 @@ APIs: RESTful API design
 
 Quick Start
 bash# Clone the repository
-git clone https://github.com/Kgbadao/telemedical-platform.git
-cd telemedical-platform
+git clone https://github.com/Kgbadao/my-react-app
+cd my-react-app
 
 # Install dependencies
 npm install
