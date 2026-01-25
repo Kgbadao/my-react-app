@@ -24,13 +24,12 @@ cd my-react-app
 
 # Install dependencies
 npm install
-# Set up Firebase credentials
-# Create a .env file with your Firebase config
-# REACT_APP_FIREBASE_API_KEY=your_key
-# REACT_APP_FIREBASE_PROJECT_ID=your_id
-# etc.
-# Start the development server
-
+#Set up Firebase credentials
+#Create a .env file with your Firebase config
+#REACT_APP_FIREBASE_API_KEY=your_key
+#REACT_APP_FIREBASE_PROJECT_ID=your_id
+#etc.
+#Start the development server
 
 npm start
 💡 What I Learned
