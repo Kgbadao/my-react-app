@@ -13,10 +13,10 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import xss from 'xss';
 import path from 'path';
+import 'dotenv/config';
 
 const app = express();
-const PORT = 5000;
-
+const PORT = process.env.PORT || 5000;
 // ========================================
 // HTTP Server & Socket.io Setup
 // ========================================
@@ -27,7 +27,7 @@ const io = new Server(server, {
     origin: [
       'http://localhost:5173', 
       'http://localhost:3000',
-      process.env.FRONTEND_URL || 'https://your-app.vercel.app'
+      'https://my-react-app-n8v7.vercel.app' // Update this to your production URL
     ],
     methods: ['GET', 'POST'],
     credentials: true
@@ -60,8 +60,10 @@ const auth = getAuth();
 // Middleware
 app.use(helmet());
 app.use(cors({ 
-  origin: ['http://localhost:5173', 'http://localhost:3000',
-    process.env.FRONTEND_URL || 'https://my-react-app-psi-kohl.vercel.app',
+  origin: [
+    'http://localhost:5173', 
+    'http://localhost:3000',
+    'https://my-react-app-n8v7.vercel.app' // Match the production URL exactly
   ], 
   credentials: true 
 }));
