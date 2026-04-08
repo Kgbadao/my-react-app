@@ -71,7 +71,7 @@ const timeSlots = [
 ];
 
 const AppointmentForm = () => {
-  const [step, setStep] = useState(1); // Multi-step form
+  const [step, setStep] = useState(1);
   const [formDate, setFormDate] = useState('');
   const [formTime, setFormTime] = useState('');
   const [formDoctorId, setFormDoctorId] = useState('');
@@ -81,6 +81,9 @@ const AppointmentForm = () => {
   const [userId] = useState('user123'); // replace with real logged-in user ID later
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // --- API CONFIGURATION ---
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const filteredDoctors = doctors.filter(doc =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -113,8 +116,8 @@ const AppointmentForm = () => {
       setLoading(true);
       setMessage('');
 
-      // Check for conflict before booking
-      const checkRes = await axios.get('http://localhost:5000/api/appointments/check', {
+      // Check for conflict using the dynamic API URL
+      const checkRes = await axios.get(`${API_BASE_URL}/api/appointments/check`, {
         params: {
           date: formDate,
           time: formTime,
@@ -127,10 +130,11 @@ const AppointmentForm = () => {
         return;
       }
 
-      await axios.post('http://localhost:5000/api/appointments', appointmentData);
+      // Create appointment using the dynamic API URL
+      await axios.post(`${API_BASE_URL}/api/appointments`, appointmentData);
 
       setMessage('success');
-      // Reset form after 3 seconds
+      
       setTimeout(() => {
         setStep(1);
         setFormDate('');
@@ -148,13 +152,11 @@ const AppointmentForm = () => {
     }
   };
 
-  // Get minimum date (today)
   const getMinDate = () => {
     const today = new Date();
     return today.toISOString().split('T')[0];
   };
 
-  // Success Screen
   if (message === 'success') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center p-6">
@@ -185,49 +187,30 @@ const AppointmentForm = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
-            Book Your Appointment
-          </h1>
-          <p className="text-xl text-gray-600">
-            Connect with top healthcare professionals in minutes
-          </p>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">Book Your Appointment</h1>
+          <p className="text-xl text-gray-600">Connect with top healthcare professionals in minutes</p>
         </div>
 
-        {/* Progress Steps */}
         <div className="flex items-center justify-center mb-12">
           <div className="flex items-center gap-4">
             <div className={`flex items-center gap-3 ${step >= 1 ? 'opacity-100' : 'opacity-40'}`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                step >= 1 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-200 text-gray-600'
-              }`}>
-                1
-              </div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 1 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-200 text-gray-600'}`}>1</div>
               <span className="hidden sm:block font-medium text-gray-700">Choose Doctor</span>
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400" />
             <div className={`flex items-center gap-3 ${step >= 2 ? 'opacity-100' : 'opacity-40'}`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                step >= 2 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-200 text-gray-600'
-              }`}>
-                2
-              </div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 2 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-200 text-gray-600'}`}>2</div>
               <span className="hidden sm:block font-medium text-gray-700">Select Time</span>
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400" />
             <div className={`flex items-center gap-3 ${step >= 3 ? 'opacity-100' : 'opacity-40'}`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                step >= 3 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-200 text-gray-600'
-              }`}>
-                3
-              </div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${step >= 3 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-200 text-gray-600'}`}>3</div>
               <span className="hidden sm:block font-medium text-gray-700">Confirm</span>
             </div>
           </div>
         </div>
 
-        {/* Step 1: Choose Doctor */}
         {step === 1 && (
           <div className="animate-fadeIn">
             <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
@@ -257,9 +240,7 @@ const AppointmentForm = () => {
                         {doctor.avatar}
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-gray-800 mb-1 group-hover:text-indigo-600 transition">
-                          {doctor.name}
-                        </h3>
+                        <h3 className="text-xl font-semibold text-gray-800 mb-1 group-hover:text-indigo-600 transition">{doctor.name}</h3>
                         <div className="flex items-center gap-2 text-gray-600 mb-3">
                           <DoctorIcon className="w-4 h-4" />
                           <span className="text-sm">{doctor.specialty}</span>
@@ -288,7 +269,6 @@ const AppointmentForm = () => {
           </div>
         )}
 
-        {/* Step 2: Select Date & Time */}
         {step === 2 && selectedDoctor && (
           <div className="animate-fadeIn">
             <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
@@ -302,20 +282,13 @@ const AppointmentForm = () => {
                     <p className="text-sm text-gray-600">{selectedDoctor.specialty}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setStep(1)}
-                  className="text-indigo-600 hover:text-indigo-700 font-medium text-sm"
-                >
-                  Change Doctor
-                </button>
+                <button onClick={() => setStep(1)} className="text-indigo-600 hover:text-indigo-700 font-medium text-sm">Change Doctor</button>
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Date Selection */}
                 <div>
                   <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-                    <Calendar className="w-5 h-5 text-indigo-600" />
-                    Select Date
+                    <Calendar className="w-5 h-5 text-indigo-600" /> Select Date
                   </label>
                   <input
                     type="date"
@@ -326,12 +299,9 @@ const AppointmentForm = () => {
                     required
                   />
                 </div>
-
-                {/* Time Selection */}
                 <div>
                   <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-                    <Clock className="w-5 h-5 text-indigo-600" />
-                    Select Time
+                    <Clock className="w-5 h-5 text-indigo-600" /> Select Time
                   </label>
                   <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto">
                     {timeSlots.map((time) => (
@@ -340,9 +310,7 @@ const AppointmentForm = () => {
                         type="button"
                         onClick={() => setFormTime(time)}
                         className={`py-2 px-3 rounded-lg border-2 transition font-medium text-sm ${
-                          formTime === time
-                            ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
-                            : 'border-gray-200 hover:border-indigo-300 text-gray-700'
+                          formTime === time ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:border-indigo-300 text-gray-700'
                         }`}
                       >
                         {time}
@@ -353,13 +321,11 @@ const AppointmentForm = () => {
               </div>
 
               <div className="mt-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Additional Notes (Optional)
-                </label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Notes (Optional)</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Describe your symptoms or reason for visit..."
+                  placeholder="Describe your symptoms..."
                   rows="3"
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
@@ -376,7 +342,6 @@ const AppointmentForm = () => {
           </div>
         )}
 
-        {/* Step 3: Confirm */}
         {step === 3 && selectedDoctor && (
           <div className="animate-fadeIn">
             <div className="bg-white rounded-2xl shadow-lg p-8 max-w-2xl mx-auto">
@@ -396,9 +361,7 @@ const AppointmentForm = () => {
                   <Calendar className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Date</p>
-                    <p className="font-semibold text-gray-800">
-                      {new Date(formDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                    </p>
+                    <p className="font-semibold text-gray-800">{new Date(formDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
                   </div>
                 </div>
 
@@ -429,12 +392,7 @@ const AppointmentForm = () => {
               )}
 
               <div className="flex gap-4">
-                <button
-                  onClick={() => setStep(2)}
-                  className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-xl font-semibold hover:bg-gray-200 transition"
-                >
-                  Go Back
-                </button>
+                <button onClick={() => setStep(2)} className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-xl font-semibold hover:bg-gray-200 transition">Go Back</button>
                 <button
                   onClick={handleSubmit}
                   disabled={loading}
@@ -449,19 +407,8 @@ const AppointmentForm = () => {
       </div>
 
       <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.4s ease-out;
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
       `}</style>
     </div>
   );
