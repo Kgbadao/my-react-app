@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Phone, Video, MoreVertical, Paperclip, Smile, ArrowLeft, User, Search, Trash2, Volume2, VolumeX, Settings, Edit2, Reply, Check, CheckCheck, AlertCircle, Loader, X, Download } from 'lucide-react';
+import { Send, MoreVertical, Paperclip, Search, User, Trash2, Volume2, VolumeX, Edit2, Check, CheckCheck, AlertCircle, Loader, X } from 'lucide-react';
 import { io } from 'socket.io-client';
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
 
 function Chat({ roomId = 'default-room', userToken, currentUser }) {
   const [messages, setMessages] = useState([]);
@@ -13,89 +15,35 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState([]);
   const [replyTo, setReplyTo] = useState(null);
-  const [editingMessage, setEditingMessage] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [roomUsers, setRoomUsers] = useState([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [error, setError] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isAuthValid, setIsAuthValid] = useState(false);
-  
+
   const messagesEndRef = useRef(null);
   const dropdownRef = useRef(null);
   const socketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
-  const messagesContainerRef = useRef(null);
 
-  const chatRoomName = "Doctor Consultation";
-  const user = currentUser || JSON.parse(localStorage.getItem('user')) || { 
-    id: 'test-user-' + Date.now(), 
-    name: 'Test User',
-    email: 'test@example.com'
+  const chatRoomName = 'Doctor Consultation';
+  const user = currentUser || JSON.parse(localStorage.getItem('user')) || {
+    id: 'guest-' + Date.now(),
+    name: 'Guest User',
+    email: 'guest@example.com',
   };
 
-  // Initialize authentication and socket
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        let token = userToken || localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-        
+        const token = userToken || localStorage.getItem('authToken');
+
         if (!token) {
-          console.warn('⚠️ No token found. Attempting test login...');
-          
-          try {
-            const loginResponse = await fetch('http://localhost:5000/api/auth/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                email: 'test@example.com', 
-                password: 'test123456' 
-              })
-            });
-
-            if (loginResponse.ok) {
-              const loginData = await loginResponse.json();
-              token = loginData.token;
-              localStorage.setItem('authToken', token);
-              localStorage.setItem('user', JSON.stringify({
-                id: loginData.userId,
-                name: loginData.name,
-                email: loginData.email
-              }));
-              console.log('✅ Test login successful');
-            } else {
-              const registerResponse = await fetch('http://localhost:5000/api/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  name: 'Test User',
-                  email: 'test@example.com', 
-                  password: 'test123456' 
-                })
-              });
-
-              if (registerResponse.ok) {
-                const registerData = await registerResponse.json();
-                token = registerData.token;
-                localStorage.setItem('authToken', token);
-                localStorage.setItem('user', JSON.stringify({
-                  id: registerData.userId,
-                  name: registerData.name,
-                  email: registerData.email
-                }));
-                console.log('✅ Test registration successful');
-              } else {
-                throw new Error('Both login and registration failed');
-              }
-            }
-          } catch (authError) {
-            console.error('❌ Authentication setup failed:', authError);
-            setError('Backend not running. Start it with: node server.js');
-            setIsAuthValid(false);
-            return;
-          }
+          setError('No auth token found. Please login first.');
+          setIsAuthValid(false);
+          return;
         }
 
         setIsAuthValid(true);
@@ -107,105 +55,96 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
     };
 
     initializeAuth();
+
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
+    };
   }, []);
 
   const initializeSocket = (token) => {
-    try {
-      const socket = io('http://localhost:5000', {
-        auth: { token },
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5
-      });
+    const socket = io(API_URL, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+    });
 
-      socketRef.current = socket;
+    socketRef.current = socket;
 
-      socket.on('connect', () => {
-        console.log('✅ Connected to chat server');
-        setIsConnected(true);
-        setError(null);
-        socket.emit('join-room', roomId);
-        loadMessages();
-      });
+    socket.on('connect', () => {
+      setIsConnected(true);
+      setError(null);
+      socket.emit('join-room', roomId);
+      loadMessages();
+    });
 
-      socket.on('disconnect', (reason) => {
-        console.log('❌ Disconnected:', reason);
-        setIsConnected(false);
-      });
+    socket.on('disconnect', () => setIsConnected(false));
 
-      socket.on('connect_error', (err) => {
-        console.error('Socket error:', err);
-        setError(`Connection error: ${err.message}`);
-      });
+    socket.on('connect_error', (err) => {
+      setError(`Connection error: ${err.message}`);
+    });
 
-      socket.on('new-message', (message) => {
-        setMessages(prev => [...prev, message]);
-        if (message.senderId !== user.id) {
-          setUnreadCount(prev => prev + 1);
-        }
-      });
+    socket.on('new-message', (message) => {
+      setMessages((prev) => [...prev, message]);
+      if (message.senderId !== user.id) setUnreadCount((prev) => prev + 1);
+    });
 
-      socket.on('user-typing', ({ userId, userName }) => {
-        setTypingUsers(prev => [...prev.filter(u => u.userId !== userId), { userId, userName }]);
-      });
+    socket.on('user-typing', ({ userId, userName }) => {
+      setTypingUsers((prev) => [...prev.filter((u) => u.userId !== userId), { userId, userName }]);
+    });
 
-      socket.on('user-stop-typing', ({ userId }) => {
-        setTypingUsers(prev => prev.filter(u => u.userId !== userId));
-      });
+    socket.on('user-stop-typing', ({ userId }) => {
+      setTypingUsers((prev) => prev.filter((u) => u.userId !== userId));
+    });
 
-      socket.on('message-edited', ({ messageId, newText, edited }) => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === messageId ? { ...msg, text: newText, edited } : msg
-        ));
-      });
+    socket.on('message-edited', ({ messageId, newText, edited }) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === messageId ? { ...msg, text: newText, edited } : msg))
+      );
+    });
 
-      socket.on('message-deleted', ({ messageId }) => {
-        setMessages(prev => prev.map(msg => 
+    socket.on('message-deleted', ({ messageId }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
           msg.id === messageId ? { ...msg, deleted: true, text: '[Message deleted]' } : msg
-        ));
-      });
+        )
+      );
+    });
 
-      socket.on('message-read', ({ messageId, userId }) => {
-        setMessages(prev => prev.map(msg => 
+    socket.on('message-read', ({ messageId, userId }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
           msg.id === messageId ? { ...msg, readBy: [...(msg.readBy || []), userId] } : msg
-        ));
-      });
+        )
+      );
+    });
 
-      socket.on('room-users', (users) => {
-        setRoomUsers(users);
-      });
+    socket.on('room-users', (users) => setRoomUsers(users));
 
-      socket.on('message-delivered', ({ messageId }) => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === messageId ? { ...msg, status: 'delivered' } : msg
-        ));
-      });
+    socket.on('message-delivered', ({ messageId }) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === messageId ? { ...msg, status: 'delivered' } : msg))
+      );
+    });
 
-      socket.on('error', ({ message }) => {
-        setError(message);
-        setTimeout(() => setError(null), 5000);
-      });
-
-    } catch (error) {
-      console.error('Socket error:', error);
-      setError('Failed to connect socket');
-    }
+    socket.on('error', ({ message }) => {
+      setError(message);
+      setTimeout(() => setError(null), 5000);
+    });
   };
 
   const loadMessages = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
-      
-      const response = await fetch(`http://localhost:5000/api/chat/${roomId}/messages`, {
+      const response = await fetch(`${API_URL}/api/chat/${roomId}/messages`, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
@@ -246,13 +185,11 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
 
   const handleSend = () => {
     if (!newMessage.trim() || !socketRef.current || !isConnected) return;
-
     socketRef.current.emit('send-message', {
       roomId,
       text: newMessage.trim(),
-      replyTo: replyTo?.id
+      replyTo: replyTo?.id,
     });
-    
     setNewMessage('');
     setReplyTo(null);
     setIsTyping(false);
@@ -264,22 +201,19 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
       setError('File too large (max 10MB)');
       return;
     }
-
     try {
       setUploadingFile(true);
       const formData = new FormData();
       formData.append('file', file);
       const token = localStorage.getItem('authToken');
-
-      const response = await fetch(`http://localhost:5000/api/chat/${roomId}/upload`, {
+      const response = await fetch(`${API_URL}/api/chat/${roomId}/upload`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formData
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
       });
-
       if (response.ok) {
         const data = await response.json();
-        setMessages(prev => [...prev, data.message]);
+        setMessages((prev) => [...prev, data.message]);
       }
     } catch (error) {
       setError('Upload failed');
@@ -295,7 +229,7 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
   };
 
   const filteredMessages = searchQuery
-    ? messages.filter(msg => msg.text?.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? messages.filter((msg) => msg.text?.toLowerCase().includes(searchQuery.toLowerCase()))
     : messages;
 
   const getMessageStatus = (message) => {
@@ -309,9 +243,8 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
       <div className="flex h-screen bg-red-50 items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Backend Connection Failed</h2>
-          <p className="text-gray-600">Make sure your backend is running on http://localhost:5000</p>
-          <p className="text-sm text-gray-500 mt-2">Run: node server.js</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Not Authenticated</h2>
+          <p className="text-gray-600">Please login to access the chat.</p>
         </div>
       </div>
     );
@@ -339,18 +272,17 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
       <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 shadow-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-semibold">
+            <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white">
               <User className="w-6 h-6" />
             </div>
             <div>
               <h1 className="font-bold text-lg text-gray-900">{chatRoomName}</h1>
               <p className="text-xs text-gray-600">
                 {roomUsers.length > 0 && `${roomUsers.length} online`}
-                {typingUsers.length > 0 && ` • typing...`}
+                {typingUsers.length > 0 && ' • typing...'}
               </p>
             </div>
           </div>
-          
           <div className="flex items-center gap-1">
             <button onClick={() => setSearchOpen(!searchOpen)} className="p-2.5 hover:bg-gray-100 rounded-xl">
               <Search className="w-5 h-5 text-gray-600" />
@@ -361,7 +293,10 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
               </button>
               {showDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-20">
-                  <button onClick={() => setIsMuted(!isMuted)} className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-700">
+                  <button
+                    onClick={() => setIsMuted(!isMuted)}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-700"
+                  >
                     {isMuted ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                     {isMuted ? 'Unmute' : 'Mute'}
                   </button>
@@ -370,7 +305,6 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
             </div>
           </div>
         </div>
-
         {searchOpen && (
           <div className="border-t border-gray-200/50 px-4 py-3">
             <input
@@ -384,9 +318,11 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
         )}
       </header>
 
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="flex-1 overflow-y-auto px-4 py-6">
         {loading ? (
-          <div className="text-center"><Loader className="w-6 h-6 animate-spin mx-auto text-indigo-600" /></div>
+          <div className="text-center">
+            <Loader className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
+          </div>
         ) : filteredMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <User className="w-12 h-12 text-indigo-200 mb-4" />
@@ -394,11 +330,15 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredMessages.map((msg, index) => {
+            {filteredMessages.map((msg) => {
               const isOwn = msg.senderId === user.id;
               return (
                 <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} group`}>
-                  <div className={`max-w-xs rounded-2xl px-4 py-2.5 ${isOwn ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border border-gray-200'}`}>
+                  <div
+                    className={`max-w-xs rounded-2xl px-4 py-2.5 ${
+                      isOwn ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border border-gray-200'
+                    }`}
+                  >
                     {!isOwn && <p className="text-xs font-medium text-gray-600 mb-1">{msg.senderName}</p>}
                     <p className="text-sm">{msg.text}</p>
                     <div className={`text-xs mt-1 flex items-center gap-1 ${isOwn ? 'text-indigo-100' : 'text-gray-400'}`}>
@@ -417,12 +357,7 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
       <div className="bg-white/80 backdrop-blur-lg border-t border-gray-200/50">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-end gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              className="hidden"
-            />
+            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingFile || !isConnected}
@@ -430,7 +365,6 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
             >
               {uploadingFile ? <Loader className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
             </button>
-            
             <textarea
               value={newMessage}
               onChange={(e) => {
@@ -448,7 +382,6 @@ function Chat({ roomId = 'default-room', userToken, currentUser }) {
               disabled={!isConnected}
               className="flex-1 bg-gray-100 border-0 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-sm disabled:opacity-50"
             />
-            
             <button
               onClick={handleSend}
               disabled={!newMessage.trim() || !isConnected}

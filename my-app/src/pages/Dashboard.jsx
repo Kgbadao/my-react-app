@@ -19,6 +19,8 @@ import {
   LogOut
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
@@ -27,11 +29,9 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
-  // Get user and token from localStorage
   const user = JSON.parse(localStorage.getItem('user'));
   const token = localStorage.getItem('authToken');
 
-  // Setup axios interceptor for token
   useEffect(() => {
     axios.interceptors.request.use((config) => {
       const authToken = localStorage.getItem('authToken');
@@ -52,7 +52,7 @@ export default function Dashboard() {
         return;
       }
 
-      const res = await axios.get('http://localhost:5000/api/appointments', {
+      const res = await axios.get(`${API_URL}/api/appointments`, {
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
@@ -80,7 +80,7 @@ export default function Dashboard() {
   const handleLogout = async () => {
     try {
       const authToken = localStorage.getItem('authToken');
-      await axios.post('http://localhost:5000/api/auth/logout', {}, {
+      await axios.post(`${API_URL}/api/auth/logout`, {}, {
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
@@ -96,40 +96,18 @@ export default function Dashboard() {
     }
   };
 
-  // Navigation handlers
-  const handleBookAppointment = () => {
-    navigate('/book-appointment');
-  };
-
-  const handleStartVideoCall = () => {
-    navigate('/video-call');
-  };
-
-  const handleMessageDoctor = () => {
-    navigate('/chat');
-  };
-
-  const handleJoinVideo = (appointmentId) => {
-    navigate(`/video-call/${appointmentId}`);
-  };
-
-  const handleChatWithDoctor = (doctorId) => {
-    navigate(`/chat/${doctorId}`);
-  };
-
-  const handleViewProfile = () => {
-    navigate('/profile');
-  };
-
-  const handleViewNotifications = () => {
-    navigate('/notifications');
-  };
+  const handleBookAppointment = () => navigate('/book-appointment');
+  const handleStartVideoCall = () => navigate('/video-call');
+  const handleMessageDoctor = () => navigate('/chat');
+  const handleJoinVideo = (appointmentId) => navigate(`/video-call/${appointmentId}`);
+  const handleChatWithDoctor = (doctorId) => navigate(`/chat/${doctorId}`);
+  const handleViewProfile = () => navigate('/profile');
+  const handleViewNotifications = () => navigate('/notifications');
 
   useEffect(() => {
     fetchAppointments();
   }, []);
 
-  // Calculate stats
   const stats = {
     total: appointments.length,
     upcoming: appointments.filter(a => a.status !== 'completed' && a.status !== 'cancelled').length,
@@ -142,19 +120,15 @@ export default function Dashboard() {
     }).length
   };
 
-  // Filter appointments
   const filteredAppointments = appointments.filter(appt => {
     const matchesSearch = searchQuery === '' || 
       appt.doctorId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       appt.patientId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       appt.notes?.toLowerCase().includes(searchQuery.toLowerCase());
-    
     const matchesFilter = filterStatus === 'all' || appt.status === filterStatus;
-    
     return matchesSearch && matchesFilter;
   });
 
-  // Get status badge
   const getStatusBadge = (status) => {
     const badges = {
       scheduled: { color: 'bg-blue-100 text-blue-700 border-blue-200', icon: Clock, label: 'Scheduled' },
@@ -162,10 +136,8 @@ export default function Dashboard() {
       completed: { color: 'bg-green-100 text-green-700 border-green-200', icon: CheckCircle, label: 'Completed' },
       cancelled: { color: 'bg-red-100 text-red-700 border-red-200', icon: XCircle, label: 'Cancelled' },
     };
-    
     const badge = badges[status] || badges.scheduled;
     const Icon = badge.icon;
-    
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border ${badge.color}`}>
         <Icon className="w-3 h-3" />
@@ -174,16 +146,13 @@ export default function Dashboard() {
     );
   };
 
-  // Format date nicely
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
     if (date.toDateString() === today.toDateString()) return 'Today';
     if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-    
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
@@ -206,7 +175,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      {/* Top Navigation */}
       <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -218,19 +186,12 @@ export default function Dashboard() {
               <p className="text-xs text-gray-500">Patient Portal</p>
             </div>
           </div>
-          
           <div className="flex items-center gap-4">
-            <button 
-              onClick={handleViewNotifications}
-              className="relative p-2 hover:bg-gray-100 rounded-full transition"
-            >
+            <button onClick={handleViewNotifications} className="relative p-2 hover:bg-gray-100 rounded-full transition">
               <Bell className="w-5 h-5 text-gray-600" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
-            <button 
-              onClick={handleViewProfile}
-              className="flex items-center gap-3 pl-4 border-l border-gray-200 hover:bg-gray-50 rounded-lg p-2 transition"
-            >
+            <button onClick={handleViewProfile} className="flex items-center gap-3 pl-4 border-l border-gray-200 hover:bg-gray-50 rounded-lg p-2 transition">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-gray-800">{user?.name || 'Guest User'}</p>
                 <p className="text-xs text-gray-500">{user?.email || 'user@example.com'}</p>
@@ -239,11 +200,7 @@ export default function Dashboard() {
                 {user?.name?.charAt(0).toUpperCase() || 'U'}
               </div>
             </button>
-            <button
-              onClick={handleLogout}
-              className="p-2 hover:bg-red-50 rounded-full transition text-red-600"
-              title="Logout"
-            >
+            <button onClick={handleLogout} className="p-2 hover:bg-red-50 rounded-full transition text-red-600" title="Logout">
               <LogOut className="w-5 h-5" />
             </button>
           </div>
@@ -251,7 +208,6 @@ export default function Dashboard() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Welcome Section */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-gray-800 mb-2">
             Welcome back, {user?.name?.split(' ')[0] || 'there'}! 👋
@@ -259,7 +215,6 @@ export default function Dashboard() {
           <p className="text-gray-600">Here's what's happening with your health today</p>
         </div>
 
-        {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-6 rounded-2xl shadow-md border border-indigo-100 hover:shadow-lg transition">
             <div className="flex items-center justify-between mb-4">
@@ -271,7 +226,6 @@ export default function Dashboard() {
             <p className="text-gray-600 text-sm mb-1">Total Appointments</p>
             <p className="text-3xl font-bold text-gray-800">{stats.total}</p>
           </div>
-
           <div className="bg-white p-6 rounded-2xl shadow-md border border-blue-100 hover:shadow-lg transition">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -281,7 +235,6 @@ export default function Dashboard() {
             <p className="text-gray-600 text-sm mb-1">Upcoming</p>
             <p className="text-3xl font-bold text-gray-800">{stats.upcoming}</p>
           </div>
-
           <div className="bg-white p-6 rounded-2xl shadow-md border border-green-100 hover:shadow-lg transition">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
@@ -291,7 +244,6 @@ export default function Dashboard() {
             <p className="text-gray-600 text-sm mb-1">Completed</p>
             <p className="text-3xl font-bold text-gray-800">{stats.completed}</p>
           </div>
-
           <div className="bg-white p-6 rounded-2xl shadow-md border border-purple-100 hover:shadow-lg transition">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
@@ -303,32 +255,21 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <button 
-            onClick={handleBookAppointment}
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-xl shadow-md hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-3"
-          >
+          <button onClick={handleBookAppointment} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-xl shadow-md hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-3">
             <Plus className="w-5 h-5" />
             <span className="font-semibold">Book Appointment</span>
           </button>
-          <button 
-            onClick={handleStartVideoCall}
-            className="bg-white text-gray-700 p-4 rounded-xl shadow-md hover:shadow-xl transition border border-gray-200 flex items-center justify-center gap-3"
-          >
+          <button onClick={handleStartVideoCall} className="bg-white text-gray-700 p-4 rounded-xl shadow-md hover:shadow-xl transition border border-gray-200 flex items-center justify-center gap-3">
             <Video className="w-5 h-5 text-indigo-600" />
             <span className="font-semibold">Start Video Call</span>
           </button>
-          <button 
-            onClick={handleMessageDoctor}
-            className="bg-white text-gray-700 p-4 rounded-xl shadow-md hover:shadow-xl transition border border-gray-200 flex items-center justify-center gap-3"
-          >
+          <button onClick={handleMessageDoctor} className="bg-white text-gray-700 p-4 rounded-xl shadow-md hover:shadow-xl transition border border-gray-200 flex items-center justify-center gap-3">
             <MessageCircle className="w-5 h-5 text-indigo-600" />
             <span className="font-semibold">Message Doctor</span>
           </button>
         </div>
 
-        {/* Search and Filter */}
         <div className="bg-white p-6 rounded-2xl shadow-md mb-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
@@ -342,41 +283,23 @@ export default function Dashboard() {
               />
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setFilterStatus('all')}
-                className={`px-4 py-2 rounded-xl font-medium transition ${
-                  filterStatus === 'all'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setFilterStatus('scheduled')}
-                className={`px-4 py-2 rounded-xl font-medium transition ${
-                  filterStatus === 'scheduled'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Scheduled
-              </button>
-              <button
-                onClick={() => setFilterStatus('completed')}
-                className={`px-4 py-2 rounded-xl font-medium transition ${
-                  filterStatus === 'completed'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Completed
-              </button>
+              {['all', 'scheduled', 'completed'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setFilterStatus(status)}
+                  className={`px-4 py-2 rounded-xl font-medium transition capitalize ${
+                    filterStatus === status
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Loading / Error */}
         {loading && (
           <div className="text-center py-20">
             <div className="inline-block w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -391,7 +314,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Appointments */}
         {!loading && !error && (
           <>
             <div className="flex items-center justify-between mb-6">
@@ -411,10 +333,7 @@ export default function Dashboard() {
                     ? 'Try adjusting your search or filters'
                     : 'Get started by booking your first appointment'}
                 </p>
-                <button 
-                  onClick={handleBookAppointment}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition inline-flex items-center gap-2"
-                >
+                <button onClick={handleBookAppointment} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition inline-flex items-center gap-2">
                   <Plus className="w-5 h-5" />
                   Book an Appointment
                 </button>
@@ -422,17 +341,13 @@ export default function Dashboard() {
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {filteredAppointments.map((appt) => (
-                  <div
-                    key={appt.id}
-                    className="bg-white p-6 rounded-2xl shadow-md border border-gray-100 hover:shadow-xl transition group"
-                  >
+                  <div key={appt.id} className="bg-white p-6 rounded-2xl shadow-md border border-gray-100 hover:shadow-xl transition group">
                     <div className="flex items-start justify-between mb-4">
                       {getStatusBadge(appt.status || 'scheduled')}
                       <button className="p-1 hover:bg-gray-100 rounded-full opacity-0 group-hover:opacity-100 transition">
                         <Settings className="w-4 h-4 text-gray-400" />
                       </button>
                     </div>
-
                     <div className="space-y-3 mb-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
@@ -443,7 +358,6 @@ export default function Dashboard() {
                           <p className="font-semibold text-gray-800">{appt.doctorId}</p>
                         </div>
                       </div>
-
                       <div className="flex items-center gap-3 text-sm text-gray-600">
                         <Calendar className="w-4 h-4 text-indigo-600" />
                         <span className="font-medium">{formatDate(appt.date)}</span>
@@ -452,7 +366,6 @@ export default function Dashboard() {
                         <span className="font-medium">{appt.time}</span>
                       </div>
                     </div>
-
                     {appt.notes && (
                       <div className="bg-gray-50 p-3 rounded-lg mb-4">
                         <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
@@ -462,19 +375,12 @@ export default function Dashboard() {
                         <p className="text-sm text-gray-700">{appt.notes}</p>
                       </div>
                     )}
-
                     <div className="flex gap-2 pt-4 border-t border-gray-100">
-                      <button 
-                        onClick={() => handleJoinVideo(appt.id)}
-                        className="flex-1 bg-indigo-50 text-indigo-700 py-2 rounded-lg hover:bg-indigo-100 transition text-sm font-medium flex items-center justify-center gap-2"
-                      >
+                      <button onClick={() => handleJoinVideo(appt.id)} className="flex-1 bg-indigo-50 text-indigo-700 py-2 rounded-lg hover:bg-indigo-100 transition text-sm font-medium flex items-center justify-center gap-2">
                         <Video className="w-4 h-4" />
                         Join
                       </button>
-                      <button 
-                        onClick={() => handleChatWithDoctor(appt.doctorId)}
-                        className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition text-sm font-medium flex items-center justify-center gap-2"
-                      >
+                      <button onClick={() => handleChatWithDoctor(appt.doctorId)} className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition text-sm font-medium flex items-center justify-center gap-2">
                         <MessageCircle className="w-4 h-4" />
                         Chat
                       </button>
