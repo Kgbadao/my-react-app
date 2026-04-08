@@ -24,12 +24,11 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
-  process.env.FRONTEND_URL, // set this in Render env vars
+  process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. mobile apps, curl)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error(`CORS policy: origin ${origin} not allowed`));
@@ -39,11 +38,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Handle preflight requests for all routes
 app.options(/.*/, cors());
 
 // ========================================
-// HTTP Server & Socket.io Setup
+// HTTP Server & Socket.io
 // ========================================
 const server = createServer(app);
 
@@ -56,21 +54,9 @@ const io = new Server(server, {
 });
 
 // ========================================
-// Firebase Admin Setup (via env vars)
+// Firebase Admin — loaded from one JSON env var
 // ========================================
-const serviceAccount = {
-  type: 'service_account',
-  project_id: process.env.FIREBASE_PROJECT_ID,
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-  token_uri: 'https://oauth2.googleapis.com/token',
-  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL,
-  universe_domain: 'googleapis.com',
-};
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 initializeApp({
   credential: cert(serviceAccount),
@@ -87,18 +73,16 @@ const auth = getAuth();
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(express.json());
 
-// Rate limiting
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 100,
 });
 app.use('/api/', limiter);
 
-// Google OAuth client
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ========================================
-// File Upload Configuration
+// File Upload
 // ========================================
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -114,7 +98,7 @@ const upload = multer({
 });
 
 // ========================================
-// Utility Functions
+// Helpers
 // ========================================
 const sanitizeInput = (text) => {
   return xss(text, { whiteList: {}, stripIgnoreTag: true });
@@ -138,7 +122,7 @@ const verifyToken = async (req, res, next) => {
       }
       throw new Error('Invalid token format');
     }
-  } catch (error) {
+  } catch {
     return res.status(403).json({ error: 'Invalid token' });
   }
 };
@@ -152,10 +136,7 @@ const typingUsers = new Map();
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token;
-
-    if (!token) {
-      return next(new Error('Auth error: No token provided'));
-    }
+    if (!token) return next(new Error('Auth error: No token provided'));
 
     let decodedToken;
 
@@ -166,8 +147,8 @@ io.use(async (socket, next) => {
         const parts = token.split('.');
         if (parts.length !== 3) throw new Error('Invalid token format');
         decodedToken = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-      } catch (decodeError) {
-        return next(new Error(`Auth error: Invalid token`));
+      } catch {
+        return next(new Error('Auth error: Invalid token'));
       }
     }
 
@@ -262,7 +243,7 @@ io.on('connection', (socket) => {
     try {
       const messageRef = db.collection('chatRooms').doc(roomId).collection('messages').doc(messageId);
       await messageRef.update({
-        readBy: FieldValue.arrayUnion(socket.userId), // fixed
+        readBy: FieldValue.arrayUnion(socket.userId),
       });
       io.to(roomId).emit('message-read', { messageId, userId: socket.userId });
     } catch (error) {
@@ -288,7 +269,7 @@ io.on('connection', (socket) => {
       });
 
       io.to(roomId).emit('message-edited', { messageId, newText: sanitizedText, edited: true });
-    } catch (error) {
+    } catch {
       socket.emit('error', { message: 'Failed to edit' });
     }
   });
@@ -310,7 +291,7 @@ io.on('connection', (socket) => {
       });
 
       io.to(roomId).emit('message-deleted', { messageId });
-    } catch (error) {
+    } catch {
       socket.emit('error', { message: 'Failed to delete' });
     }
   });
@@ -319,7 +300,7 @@ io.on('connection', (socket) => {
     try {
       const messageRef = db.collection('chatRooms').doc(roomId).collection('messages').doc(messageId);
       await messageRef.update({
-        [`reactions.${emoji}`]: FieldValue.arrayUnion(socket.userId), // fixed
+        [`reactions.${emoji}`]: FieldValue.arrayUnion(socket.userId),
       });
       io.to(roomId).emit('reaction-added', { messageId, emoji, userId: socket.userId });
     } catch (error) {
@@ -342,7 +323,7 @@ io.on('connection', (socket) => {
 });
 
 // ========================================
-// 🔐 AUTHENTICATION ROUTES
+// 🔐 AUTH ROUTES
 // ========================================
 
 app.post('/api/auth/register', async (req, res) => {
@@ -364,7 +345,6 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(409).json({ message: 'User already exists' });
     }
 
-    // Hash password before storing
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let firebaseUser;
@@ -377,7 +357,7 @@ app.post('/api/auth/register', async (req, res) => {
     const newUser = {
       name,
       email,
-      password: hashedPassword, // stored hashed
+      password: hashedPassword,
       firebaseUid: firebaseUser?.uid || null,
       provider: 'email',
       createdAt: new Date().toISOString(),
@@ -423,7 +403,6 @@ app.post('/api/auth/login', async (req, res) => {
     const userDoc = snapshot.docs[0];
     const user = userDoc.data();
 
-    // Compare hashed password
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
       return res.status(403).json({ message: 'Incorrect password' });
@@ -501,7 +480,7 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // ========================================
-// 💬 CHAT REST API ROUTES
+// 💬 CHAT ROUTES
 // ========================================
 
 app.get('/api/chat/:roomId/messages', verifyToken, async (req, res) => {
@@ -715,7 +694,7 @@ app.get('/api/dashboard', verifyToken, async (req, res) => {
 // 🚀 Start Server
 // ========================================
 server.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  console.log(`✅ Socket.io enabled for real-time chat`);
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`✅ Socket.io enabled`);
   console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
 });
