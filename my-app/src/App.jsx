@@ -26,8 +26,8 @@ export default function App() {
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/contactpage" element={<ContactPage />} />
           <Route path="/video-call" element={<VideoCallComponent />} />
+          <Route path="/notifications" element={<PrivateRoute><div className="p-20 text-center">Notifications Coming Soon!</div></PrivateRoute>} />
           <Route path="/chat" element={<Chat />} />
-          <Route path="/chat/:roomId" element={<Chat />} />
           <Route path="/appointmentform" element={<AppointmentForm />} />
           <Route path="/doctorregistration" element={<DoctorRegistration />} />
 
