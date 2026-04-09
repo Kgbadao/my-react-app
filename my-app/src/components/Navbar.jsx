@@ -32,9 +32,14 @@ function Navbar() {
           <li>
             <Link to="/services" className={`px-3 py-2 rounded-md transition ${isActive("/services") ? "bg-blue-500 text-white" : "hover:text-blue-300"}`}>Services</Link>
           </li>
-          <li>
-            <Link to="/chat" className={`px-3 py-2 rounded-md transition ${isActive("/chat") ? "bg-blue-500 text-white" : "hover:text-blue-300"}`}>Chat</Link>
-          </li>
+         <li>
+         <Link 
+         to="/dashboard" 
+        className={`px-3 py-2 rounded-md transition ${isActive("/dashboard") ? "bg-blue-500 text-white" : "hover:text-blue-300"}`}
+  >
+    Chat
+  </Link>
+</li>
           <li>
             <Link to="/doctorregistration" className={`px-3 py-2 rounded-md transition ${isActive("/doctorregistration") ? "bg-blue-500 text-white" : "hover:text-blue-300"}`}>Doctor</Link>
           </li>
