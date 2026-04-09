@@ -1,397 +1,313 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, MoreVertical, Paperclip, Search, User, Trash2, Volume2, VolumeX, Edit2, Check, CheckCheck, AlertCircle, Loader, X } from 'lucide-react';
+import { 
+  Send, 
+  Paperclip, 
+  Search, 
+  User, 
+  Circle, 
+  FileText, 
+  Image as ImageIcon, 
+  MoreVertical,
+  ChevronLeft,
+  Loader2,
+  AlertCircle,
+  X,
+  Clock
+} from 'lucide-react';
 import { io } from 'socket.io-client';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
 
-function Chat({ roomId = 'default-room', userToken, currentUser }) {
+function Chat({ roomId, currentUser, onBack }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isConnected, setIsConnected] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState([]);
-  const [replyTo, setReplyTo] = useState(null);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [roomUsers, setRoomUsers] = useState([]);
-  const [uploadingFile, setUploadingFile] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [isAuthValid, setIsAuthValid] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
 
-  const messagesEndRef = useRef(null);
-  const dropdownRef = useRef(null);
   const socketRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const chatRoomName = 'Doctor Consultation';
-  const user = currentUser || JSON.parse(localStorage.getItem('user')) || {
-    id: 'guest-' + Date.now(),
-    name: 'Guest User',
-    email: 'guest@example.com',
-  };
+  // Fallback user check - In production, this should come from your Auth Context
+  const user = currentUser || JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const token = userToken || localStorage.getItem('authToken');
+    if (!user || !roomId) {
+      setError("Session expired or invalid consultation room.");
+      return;
+    }
 
-        if (!token) {
-          setError('No auth token found. Please login first.');
-          setIsAuthValid(false);
-          return;
-        }
-
-        setIsAuthValid(true);
-        initializeSocket(token);
-      } catch (error) {
-        console.error('Initialization error:', error);
-        setError('Failed to initialize chat');
-      }
-    };
-
-    initializeAuth();
-
-    return () => {
-      if (socketRef.current) socketRef.current.disconnect();
-    };
-  }, []);
-
-  const initializeSocket = (token) => {
-    const socket = io(API_URL, {
+    const token = localStorage.getItem('authToken');
+    
+    // Initialize Socket
+    socketRef.current = io(API_URL, {
       auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      transports: ['websocket'],
     });
 
-    socketRef.current = socket;
+    const socket = socketRef.current;
 
     socket.on('connect', () => {
       setIsConnected(true);
-      setError(null);
       socket.emit('join-room', roomId);
-      loadMessages();
-    });
-
-    socket.on('disconnect', () => setIsConnected(false));
-
-    socket.on('connect_error', (err) => {
-      setError(`Connection error: ${err.message}`);
+      fetchHistory();
     });
 
     socket.on('new-message', (message) => {
-      setMessages((prev) => [...prev, message]);
-      if (message.senderId !== user.id) setUnreadCount((prev) => prev + 1);
+      if (message.roomId === roomId) {
+        setMessages((prev) => [...prev, message]);
+      }
     });
 
     socket.on('user-typing', ({ userId, userName }) => {
-      setTypingUsers((prev) => [...prev.filter((u) => u.userId !== userId), { userId, userName }]);
-    });
-
-    socket.on('user-stop-typing', ({ userId }) => {
-      setTypingUsers((prev) => prev.filter((u) => u.userId !== userId));
-    });
-
-    socket.on('message-edited', ({ messageId, newText, edited }) => {
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === messageId ? { ...msg, text: newText, edited } : msg))
-      );
-    });
-
-    socket.on('message-deleted', ({ messageId }) => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId ? { ...msg, deleted: true, text: '[Message deleted]' } : msg
-        )
-      );
-    });
-
-    socket.on('message-read', ({ messageId, userId }) => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === messageId ? { ...msg, readBy: [...(msg.readBy || []), userId] } : msg
-        )
-      );
-    });
-
-    socket.on('room-users', (users) => setRoomUsers(users));
-
-    socket.on('message-delivered', ({ messageId }) => {
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === messageId ? { ...msg, status: 'delivered' } : msg))
-      );
-    });
-
-    socket.on('error', ({ message }) => {
-      setError(message);
-      setTimeout(() => setError(null), 5000);
-    });
-  };
-
-  const loadMessages = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/api/chat/${roomId}/messages`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.messages || []);
+      if (userId !== user.id) {
+        setTypingUsers((prev) => [...new Set([...prev, userName])]);
       }
-    } catch (error) {
-      console.error('Failed to load messages:', error);
+    });
+
+    socket.on('user-stop-typing', ({ userName }) => {
+      setTypingUsers((prev) => prev.filter(name => name !== userName));
+    });
+
+    socket.on('connect_error', () => setError("Lost connection to server..."));
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [roomId]);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const fetchHistory = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const res = await fetch(`${API_URL}/api/chat/${roomId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setMessages(data.messages || []);
+    } catch (err) {
+      console.error("History fetch error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const handleSend = (e) => {
+    e?.preventDefault();
+    if (!newMessage.trim() || !isConnected) return;
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleTyping = () => {
-    if (!socketRef.current || !isConnected) return;
-    if (!isTyping) {
-      setIsTyping(true);
-      socketRef.current.emit('typing', roomId);
-    }
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-      socketRef.current.emit('stop-typing', roomId);
-    }, 1000);
-  };
-
-  const handleSend = () => {
-    if (!newMessage.trim() || !socketRef.current || !isConnected) return;
     socketRef.current.emit('send-message', {
       roomId,
       text: newMessage.trim(),
-      replyTo: replyTo?.id,
+      senderId: user.id,
+      senderName: user.name,
+      createdAt: new Date().toISOString()
     });
+
     setNewMessage('');
-    setReplyTo(null);
-    setIsTyping(false);
+    socketRef.current.emit('stop-typing', roomId);
   };
 
   const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || file.size > 10 * 1024 * 1024) {
-      setError('File too large (max 10MB)');
-      return;
-    }
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingFile(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('roomId', roomId);
+
     try {
-      setUploadingFile(true);
-      const formData = new FormData();
-      formData.append('file', file);
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/api/chat/${roomId}/upload`, {
+      const res = await fetch(`${API_URL}/api/chat/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
-        body: formData,
+        body: formData
       });
-      if (response.ok) {
-        const data = await response.json();
-        setMessages((prev) => [...prev, data.message]);
+      
+      if (res.ok) {
+        const { message } = await res.json();
+        socketRef.current.emit('send-message', message);
       }
-    } catch (error) {
-      setError('Upload failed');
+    } catch (err) {
+      setError("File upload failed.");
     } finally {
       setUploadingFile(false);
     }
   };
 
-  const handleDeleteMessage = (messageId) => {
-    if (window.confirm('Delete this message?') && socketRef.current) {
-      socketRef.current.emit('delete-message', { roomId, messageId });
-    }
-  };
+  const filteredMessages = messages.filter(m => 
+    m.text?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const filteredMessages = searchQuery
-    ? messages.filter((msg) => msg.text?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : messages;
-
-  const getMessageStatus = (message) => {
-    if (message.senderId !== user.id) return null;
-    if (message.readBy?.length > 1) return <CheckCheck className="w-3 h-3 text-blue-500" />;
-    return <Check className="w-3 h-3" />;
-  };
-
-  if (!isAuthValid) {
-    return (
-      <div className="flex h-screen bg-red-50 items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Not Authenticated</h2>
-          <p className="text-gray-600">Please login to access the chat.</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex h-full items-center justify-center bg-white">
+      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+    </div>
+  );
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {!isConnected && (
-        <div className="bg-yellow-500 text-white px-4 py-2 text-center text-sm flex items-center justify-center gap-2">
-          <AlertCircle className="w-4 h-4" />
-          Connecting...
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-500 text-white px-4 py-2 text-center text-sm flex items-center justify-center gap-2">
-          <AlertCircle className="w-4 h-4" />
-          {error}
-          <button onClick={() => setError(null)} className="ml-2">
-            <X className="w-4 h-4" />
+    <div className="flex flex-col h-screen bg-[#F8FAFC]">
+      {/* --- Chat Header --- */}
+      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition md:hidden">
+            <ChevronLeft className="w-5 h-5 text-slate-600" />
           </button>
-        </div>
-      )}
-
-      <header className="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 shadow-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white">
+          <div className="relative">
+            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
               <User className="w-6 h-6" />
             </div>
-            <div>
-              <h1 className="font-bold text-lg text-gray-900">{chatRoomName}</h1>
-              <p className="text-xs text-gray-600">
-                {roomUsers.length > 0 && `${roomUsers.length} online`}
-                {typingUsers.length > 0 && ' • typing...'}
-              </p>
-            </div>
+            <Circle className={`w-3 h-3 absolute bottom-0 right-0 fill-current ${isConnected ? 'text-green-500' : 'text-slate-300'} border-2 border-white rounded-full`} />
           </div>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setSearchOpen(!searchOpen)} className="p-2.5 hover:bg-gray-100 rounded-xl">
-              <Search className="w-5 h-5 text-gray-600" />
-            </button>
-            <div className="relative" ref={dropdownRef}>
-              <button onClick={() => setShowDropdown(!showDropdown)} className="p-2.5 hover:bg-gray-100 rounded-xl">
-                <MoreVertical className="w-5 h-5 text-gray-600" />
-              </button>
-              {showDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-20">
-                  <button
-                    onClick={() => setIsMuted(!isMuted)}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm text-gray-700"
-                  >
-                    {isMuted ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                    {isMuted ? 'Unmute' : 'Mute'}
-                  </button>
-                </div>
+          <div>
+            <h2 className="font-bold text-slate-800 leading-tight">Medical Consultation</h2>
+            <p className="text-xs text-slate-500 flex items-center gap-1">
+              {typingUsers.length > 0 ? (
+                <span className="italic text-indigo-500 font-medium">{typingUsers[0]} is typing...</span>
+              ) : (
+                isConnected ? 'Active Now' : 'Connecting...'
               )}
-            </div>
+            </p>
           </div>
         </div>
-        {searchOpen && (
-          <div className="border-t border-gray-200/50 px-4 py-3">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search messages..."
-              className="w-full bg-gray-100 border-0 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        )}
+
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowSearch(!showSearch)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+            <Search className="w-5 h-5" />
+          </button>
+          <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+            <MoreVertical className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        {loading ? (
-          <div className="text-center">
-            <Loader className="w-6 h-6 animate-spin mx-auto text-indigo-600" />
+      {/* --- Search Bar --- */}
+      {showSearch && (
+        <div className="bg-white border-b px-4 py-2 animate-in slide-in-from-top duration-200">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              className="w-full pl-10 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+              placeholder="Search conversation..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
-        ) : filteredMessages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <User className="w-12 h-12 text-indigo-200 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-800">Start a conversation</h3>
+        </div>
+      )}
+
+      {/* --- Messages Area --- */}
+      <main className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        {filteredMessages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full opacity-40">
+            <div className="bg-slate-100 p-6 rounded-full mb-4">
+              <FileText className="w-12 h-12 text-slate-400" />
+            </div>
+            <p className="text-slate-600 font-medium">No messages yet. Say hello!</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredMessages.map((msg) => {
-              const isOwn = msg.senderId === user.id;
-              return (
-                <div key={msg.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} group`}>
-                  <div
-                    className={`max-w-xs rounded-2xl px-4 py-2.5 ${
-                      isOwn ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border border-gray-200'
-                    }`}
-                  >
-                    {!isOwn && <p className="text-xs font-medium text-gray-600 mb-1">{msg.senderName}</p>}
-                    <p className="text-sm">{msg.text}</p>
-                    <div className={`text-xs mt-1 flex items-center gap-1 ${isOwn ? 'text-indigo-100' : 'text-gray-400'}`}>
+          filteredMessages.map((msg, idx) => {
+            const isMe = msg.senderId === user.id;
+            return (
+              <div key={msg.id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] md:max-w-[60%] ${isMe ? 'order-1' : 'order-2'}`}>
+                  <div className={`px-4 py-2.5 rounded-2xl shadow-sm ${
+                    isMe 
+                    ? 'bg-indigo-600 text-white rounded-tr-none' 
+                    : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'
+                  }`}>
+                    {/* File Attachment UI */}
+                    {msg.fileUrl && (
+                      <div className={`mb-2 p-2 rounded-lg flex items-center gap-3 ${isMe ? 'bg-indigo-700' : 'bg-slate-50'}`}>
+                        {msg.fileType?.includes('image') ? <ImageIcon className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
+                        <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="text-xs underline truncate font-medium">
+                          View Attachment
+                        </a>
+                      </div>
+                    )}
+                    <p className="text-[14px] leading-relaxed">{msg.text}</p>
+                    <div className={`text-[10px] mt-1 flex items-center gap-1 opacity-70 ${isMe ? 'justify-end' : ''}`}>
+                      <Clock className="w-3 h-3" />
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {getMessageStatus(msg)}
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })
         )}
         <div ref={messagesEndRef} />
-      </div>
+      </main>
 
-      <div className="bg-white/80 backdrop-blur-lg border-t border-gray-200/50">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-end gap-2">
-            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingFile || !isConnected}
-              className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-600 disabled:opacity-50"
-            >
-              {uploadingFile ? <Loader className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
-            </button>
+      {/* --- Message Input --- */}
+      <footer className="p-4 bg-white border-t border-slate-200">
+        {error && (
+          <div className="mb-3 p-2 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" /> {error}
+            <button onClick={() => setError(null)} className="ml-auto"><X className="w-3 h-3" /></button>
+          </div>
+        )}
+        
+        <form onSubmit={handleSend} className="flex items-end gap-2 max-w-6xl mx-auto">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            className="hidden" 
+            accept=".pdf,.jpg,.png,.doc" 
+          />
+          <button 
+            type="button"
+            onClick={() => fileInputRef.current.click()}
+            className="p-3 text-slate-500 hover:bg-slate-100 rounded-xl transition"
+          >
+            {uploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
+          </button>
+
+          <div className="flex-1 relative">
             <textarea
+              rows="1"
               value={newMessage}
               onChange={(e) => {
                 setNewMessage(e.target.value);
-                handleTyping();
+                socketRef.current?.emit('typing', roomId);
               }}
+              placeholder="Type your health concern..."
+              className="w-full bg-slate-100 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 resize-none"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSend();
                 }
               }}
-              placeholder="Type a message..."
-              rows="1"
-              disabled={!isConnected}
-              className="flex-1 bg-gray-100 border-0 rounded-2xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-sm disabled:opacity-50"
             />
-            <button
-              onClick={handleSend}
-              disabled={!newMessage.trim() || !isConnected}
-              className="bg-indigo-600 text-white p-3 rounded-xl disabled:opacity-50 hover:shadow-lg transition"
-            >
-              <Send className="w-5 h-5" />
-            </button>
           </div>
-        </div>
-      </div>
+
+          <button 
+            type="submit"
+            disabled={!newMessage.trim() || !isConnected}
+            className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 shadow-md transition disabled:opacity-50"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </form>
+      </footer>
+
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+      `}</style>
     </div>
   );
 }
