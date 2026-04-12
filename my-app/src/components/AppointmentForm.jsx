@@ -51,35 +51,41 @@ const AppointmentForm = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formDate || !formTime || !formDoctorId) { setMessage('Please complete all steps'); return; }
-    if (!userId) { setMessage('Please log in to book an appointment'); return; }
+  e.preventDefault();
+  if (!formDate || !formTime || !formDoctorId) { setMessage('Please complete all steps'); return; }
+  if (!userId) { setMessage('Please log in to book an appointment'); return; }
 
-    try {
-      setLoading(true);
-      setMessage('');
+  try {
+    setLoading(true);
+    setMessage('');
 
-      const checkRes = await axios.get(`${API_BASE_URL}/api/appointments/check`, {
-        params: { date: formDate, time: formTime, doctorId: formDoctorId },
-      });
-      if (checkRes.data.exists) { setMessage('This time slot is already booked. Please choose another.'); return; }
+    // 1. Fixed the check call by adding the Authorization header
+    const checkRes = await axios.get(`${API_BASE_URL}/api/appointments/check`, {
+      params: { date: formDate, time: formTime, doctorId: formDoctorId },
+      headers: { Authorization: `Bearer ${token}` } // 👈 Key Fix
+    });
 
-      // ✅ Send auth token + real userId
-      const res = await axios.post(
-        `${API_BASE_URL}/api/appointments`,
-        { date: formDate, time: formTime, doctorId: formDoctorId, patientId: userId, notes },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      // ✅ Save appointmentId returned by backend
-      setBookedAppointmentId(res.data.appointmentId);
-      setMessage('success');
-    } catch (error) {
-      setMessage(error.response?.data?.message || error.response?.data?.error || 'Error creating appointment');
-    } finally {
+    if (checkRes.data.exists) { 
+      setMessage('This time slot is already booked. Please choose another.'); 
       setLoading(false);
+      return; 
     }
-  };
+
+    // 2. Fixed the booking call (Backend now gets patientId from the token)
+    const res = await axios.post(
+      `${API_BASE_URL}/api/appointments`,
+      { date: formDate, time: formTime, doctorId: formDoctorId, notes }, 
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    setBookedAppointmentId(res.data.appointmentId);
+    setMessage('success');
+  } catch (error) {
+    setMessage(error.response?.data?.message || error.response?.data?.error || 'Error creating appointment');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getMinDate = () => new Date().toISOString().split('T')[0];
 
