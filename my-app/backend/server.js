@@ -135,16 +135,13 @@ const verifyToken = async (req, res, next) => {
   const token = authHeader.split('Bearer ')[1];
 
   try {
-    // 🟢 CHANGE: Use verifyDecodedIdToken or a standard JWT check if using custom tokens
-    // For now, we will try to verify it, but we add a catch to handle the custom token issue
-    const decodedToken = await auth.verifyIdToken(token, true); 
-    req.user = decodedToken;
-    next();
-  } catch (error) {
-    console.error('Auth Error:', error.message);
-    // If verification fails, it's because verifyIdToken doesn't like Custom Tokens.
-    return res.status(403).json({ error: 'Invalid or expired token' });
-  }
+  const decodedToken = await auth.verifyIdToken(token);
+  req.user = decodedToken;
+  next();
+} catch (error) {
+  console.error('FIREBASE VERIFICATION ERROR:', error.message); // 👈 This will tell you if it's expired or wrong type
+  return res.status(403).json({ error: 'Invalid or expired token' });
+}
 };
 
 // ─── Helper: verify a user belongs to a chat room ────────────────────────────

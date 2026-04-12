@@ -37,7 +37,7 @@ const AppointmentForm = () => {
   // ✅ Real user from localStorage
   const user = JSON.parse(localStorage.getItem('user') || 'null');
   const userId = user?.id || user?.userId || '';
-  const token = localStorage.getItem('authToken');
+  const token = localStorage.getItem('token');
 
   const filteredDoctors = doctors.filter(doc =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { AlertCircle, Loader } from 'lucide-react';
+import { auth } from '../firebase'; 
+import { signInWithCustomToken } from "firebase/auth";
 
-// Add this line at the top
 const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
 
 function LoginPage() {
@@ -13,7 +14,6 @@ function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState('');
 
-  // Handle Email/Password Login
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -21,11 +21,8 @@ function LoginPage() {
 
     try {
       const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
-      const body = isRegister 
-        ? { name, email, password }
-        : { email, password };
+      const body = isRegister ? { name, email, password } : { email, password };
 
-      // CHANGED: Use API_URL instead of localhost
       const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36,10 +33,14 @@ function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // ✅ Save token for Socket.IO authentication
-        localStorage.setItem('authToken', data.token);
-        
-        // Save user info
+        // 1. EXCHANGE CUSTOM TOKEN FOR ID TOKEN
+        const userCredential = await signInWithCustomToken(auth, data.token);
+        const idToken = await userCredential.user.getIdToken();
+
+        // 2. SAVE EVERYTHING TO LOCALSTORAGE
+        localStorage.setItem('token', idToken); // Used by backend verifyIdToken
+        localStorage.setItem('authToken', data.token); // Kept for Socket.io
+        localStorage.setItem('userId', data.userId);
         localStorage.setItem('user', JSON.stringify({
           id: data.userId,
           name: data.name || name,
@@ -47,11 +48,10 @@ function LoginPage() {
           provider: 'email'
         }));
 
-        // Redirect to dashboard
-        console.log('✅ Login successful, redirecting...');
+        console.log('✅ Login successful');
         window.location.href = '/dashboard';
       } else {
-        setError(data.message || 'Authentication failed');
+        setError(data.error || data.message || 'Authentication failed');
       }
     } catch (err) {
       console.error('Error:', err);
@@ -61,7 +61,6 @@ function LoginPage() {
     }
   };
 
-  // Handle Google Login
   const handleLoginSuccess = async (credentialResponse) => {
     if (!credentialResponse?.credential) {
       setError('Google credential missing');
@@ -70,7 +69,6 @@ function LoginPage() {
 
     setLoading(true);
     try {
-      // CHANGED: Use API_URL instead of localhost
       const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,10 +79,12 @@ function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // ✅ Save token for Socket.IO authentication
+        // Google flow also needs to exchange for ID Token if backend sends Custom Token
+        const userCredential = await signInWithCustomToken(auth, data.token);
+        const idToken = await userCredential.user.getIdToken();
+
+        localStorage.setItem('token', idToken);
         localStorage.setItem('authToken', data.token);
-        
-        // Save user info
         localStorage.setItem('user', JSON.stringify({
           id: data.userId,
           name: data.name,
@@ -93,22 +93,18 @@ function LoginPage() {
           provider: 'google'
         }));
 
-        console.log('✅ Google login successful, redirecting...');
         window.location.href = '/dashboard';
       } else {
         setError(data.message || 'Google login failed');
       }
     } catch (err) {
-      console.error('Google login error:', err);
       setError('Network error during Google login');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLoginFailure = () => {
-    setError('Google login was cancelled or failed');
-  };
+  const handleLoginFailure = () => setError('Google login was cancelled or failed');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-100 via-white to-indigo-50 flex items-center justify-center px-4 py-8">
@@ -117,13 +113,7 @@ function LoginPage() {
           <h2 className="text-3xl font-bold text-center text-indigo-700 mb-2">
             {isRegister ? 'Create Account' : 'Login to TeleMed'}
           </h2>
-          <p className="text-center text-gray-600 text-sm mb-6">
-            {isRegister 
-              ? 'Join our telemedicine platform' 
-              : 'Access your consultations and appointments'}
-          </p>
-
-          {/* Error Message */}
+          
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
@@ -131,98 +121,52 @@ function LoginPage() {
             </div>
           )}
 
-          {/* Form */}
           <form className="space-y-4" onSubmit={handleFormSubmit}>
             {isRegister && (
               <input
-                type="text"
-                placeholder="Full Name"
-                value={name}
+                type="text" placeholder="Full Name" value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                required={isRegister}
-                disabled={loading}
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                required={isRegister} disabled={loading}
               />
             )}
-            
             <input
-              type="email"
-              placeholder="Email Address"
-              value={email}
+              type="email" placeholder="Email Address" value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-              required
-              disabled={loading}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required disabled={loading}
             />
-            
             <input
-              type="password"
-              placeholder="Password"
-              value={password}
+              type="password" placeholder="Password" value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-              required
-              disabled={loading}
-              minLength={isRegister ? 6 : 1}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required disabled={loading}
             />
-
-            {isRegister && (
-              <p className="text-xs text-gray-500">
-                Password must be at least 6 characters
-              </p>
-            )}
             
             <button
-              type="submit"
-              className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700 transition shadow-md font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading}
+              type="submit" disabled={loading}
+              className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700 transition shadow-md font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? (
-                <>
-                  <Loader className="w-4 h-4 animate-spin" />
-                  {isRegister ? 'Creating account...' : 'Logging in...'}
-                </>
-              ) : (
-                isRegister ? 'Create Account' : 'Login'
-              )}
+              {loading ? <Loader className="w-4 h-4 animate-spin" /> : (isRegister ? 'Create Account' : 'Login')}
             </button>
 
             <button
-              type="button"
-              onClick={() => {
-                setIsRegister(!isRegister);
-                setError(null);
-              }}
+              type="button" onClick={() => { setIsRegister(!isRegister); setError(null); }}
               className="w-full text-center text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-              disabled={loading}
             >
-              {isRegister 
-                ? 'Already have an account? Login' 
-                : "Don't have an account? Sign Up"}
+              {isRegister ? 'Already have an account? Login' : "Don't have an account? Sign Up"}
             </button>
           </form>
 
-          {/* Divider */}
           <div className="my-6 flex items-center justify-center gap-3">
             <div className="h-px flex-1 bg-gray-300" />
             <span className="text-xs text-gray-500 font-medium">OR</span>
             <div className="h-px flex-1 bg-gray-300" />
           </div>
 
-          {/* Google Login */}
           <div className="flex justify-center">
-            <GoogleLogin
-              onSuccess={handleLoginSuccess}
-              onError={handleLoginFailure}
-              useOneTap
-              text={isRegister ? "signup_with" : "signin_with"}
-            />
+            <GoogleLogin onSuccess={handleLoginSuccess} onError={handleLoginFailure} />
           </div>
-
-          {/* Footer Note */}
-          <p className="text-xs text-gray-500 text-center mt-6">
-            By logging in, you agree to our Terms of Service and Privacy Policy
-          </p>
         </div>
       </div>
     </div>
