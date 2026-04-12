@@ -34,10 +34,9 @@ const AppointmentForm = () => {
   const [loading, setLoading] = useState(false);
   const [bookedAppointmentId, setBookedAppointmentId] = useState(null);
 
-  // ✅ Real user from localStorage
+  // Read auth data from localStorage — must use 'authToken', not 'token'
   const user = JSON.parse(localStorage.getItem('user') || 'null');
-  const userId = user?.id || user?.userId || '';
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('authToken');
 
   const filteredDoctors = doctors.filter(doc =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -51,41 +50,41 @@ const AppointmentForm = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!formDate || !formTime || !formDoctorId) { setMessage('Please complete all steps'); return; }
-  if (!userId) { setMessage('Please log in to book an appointment'); return; }
+    e.preventDefault();
+    if (!formDate || !formTime || !formDoctorId) { setMessage('Please complete all steps'); return; }
+    if (!token) { setMessage('Please log in to book an appointment'); return; }
 
-  try {
-    setLoading(true);
-    setMessage('');
+    try {
+      setLoading(true);
+      setMessage('');
 
-    // 1. Fixed the check call by adding the Authorization header
-    const checkRes = await axios.get(`${API_BASE_URL}/api/appointments/check`, {
-      params: { date: formDate, time: formTime, doctorId: formDoctorId },
-      headers: { Authorization: `Bearer ${token}` } // 👈 Key Fix
-    });
+      // Check if slot is already taken
+      const checkRes = await axios.get(`${API_BASE_URL}/api/appointments/check`, {
+        params:  { date: formDate, time: formTime, doctorId: formDoctorId },
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (checkRes.data.exists) { 
-      setMessage('This time slot is already booked. Please choose another.'); 
+      if (checkRes.data.exists) {
+        setMessage('This time slot is already booked. Please choose another.');
+        setLoading(false);
+        return;
+      }
+
+      // patientId is read from the JWT on the server — don't send it in the body
+      const res = await axios.post(
+        `${API_BASE_URL}/api/appointments`,
+        { date: formDate, time: formTime, doctorId: formDoctorId, notes },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      setBookedAppointmentId(res.data.appointmentId);
+      setMessage('success');
+    } catch (error) {
+      setMessage(error.response?.data?.message || error.response?.data?.error || 'Error creating appointment');
+    } finally {
       setLoading(false);
-      return; 
     }
-
-    // 2. Fixed the booking call (Backend now gets patientId from the token)
-    const res = await axios.post(
-      `${API_BASE_URL}/api/appointments`,
-      { date: formDate, time: formTime, doctorId: formDoctorId, notes }, 
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    setBookedAppointmentId(res.data.appointmentId);
-    setMessage('success');
-  } catch (error) {
-    setMessage(error.response?.data?.message || error.response?.data?.error || 'Error creating appointment');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const getMinDate = () => new Date().toISOString().split('T')[0];
 
