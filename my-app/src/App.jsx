@@ -1,57 +1,82 @@
-import { Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar";
-import HomePage from "./pages/HomePage";
-import VideoCallComponent from "./components/VideoCallComponent";
-import Chat from "./components/Chat";
-import LoginPage from "./pages/LoginPage";
-import AboutPage from "./pages/AboutPage";
-import ServicesPage from "./pages/ServicesPage";
-import ContactPage from "./pages/ContactPage";
-import AppointmentForm from "./components/AppointmentForm";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import DoctorRegistration from "./components/DoctorRegistration";
-import PrivateRoute from "./routes/PrivateRoute";
-import PublicRoute from "./routes/PublicRoute";
-import "./index.css";
+/**
+ * App.jsx — Example routing setup
+ *
+ * This shows how to plug in ProtectedRoute and the updated VideoCallComponent.
+ * Replace your existing App.jsx routes section with this pattern.
+ */
+
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Navbar from './components/Navbar';           // updated Navbar
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Pages
+import HomePage from './pages/HomePage';
+import AboutPage from './pages/AboutPage';
+import ServicesPage from './pages/ServicesPage';
+import ContactPage from './pages/ContactPage';      // updated ContactPage
+import LoginPage from './pages/LoginPage';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import AppointmentForm from './pages/AppointmentForm';
+import Chat from './pages/Chat';
+import VideoCallComponent from './pages/VideoCallComponent'; // updated VideoCall
+import Profile from './pages/Profile';              // updated Profile
+import DoctorRegistration from './pages/DoctorRegistration';
 
 export default function App() {
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <BrowserRouter>
       <Navbar />
-      <div className="flex-1 overflow-y-auto">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/services" element={<ServicesPage />} />
-          <Route path="/contactpage" element={<ContactPage />} />
-          <Route path="/video-call" element={<VideoCallComponent />} />
-          <Route path="/notifications" element={<PrivateRoute><div className="p-20 text-center">Notifications Coming Soon!</div></PrivateRoute>} />
-          <Route path="/chat/:roomId" element={<Chat />} />
-          <Route path="/appointmentform" element={<AppointmentForm />} />
-          <Route path="/doctorregistration" element={<DoctorRegistration />} />
+      <Routes>
 
-          {/* 👇 Public Routes (only accessible if NOT logged in) */}
-          <Route path="/login" element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          } />
+        {/* ─── Public routes (anyone can visit) ─── */}
+        <Route path="/" element={<HomePage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/services" element={<ServicesPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/doctorregistration" element={<DoctorRegistration />} />
 
-          <Route path="/register" element={
-            <PublicRoute>
-              <Register />
-            </PublicRoute>
-          } />
+        {/* ─── Protected routes (must be logged in) ─── */}
+        <Route
+          path="/dashboard"
+          element={<ProtectedRoute><Dashboard /></ProtectedRoute>}
+        />
+        <Route
+          path="/appointmentform"
+          element={<ProtectedRoute><AppointmentForm /></ProtectedRoute>}
+        />
+        <Route
+          path="/profile"
+          element={<ProtectedRoute><Profile /></ProtectedRoute>}
+        />
 
-          {/* 👇 Private Routes (only accessible if logged in) */}
-          <Route path="/dashboard" element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          } />
-        </Routes>
-      </div>
-    </div>
+        {/*
+          Chat now requires an appointmentId in the URL.
+          This matches what your Dashboard already does:
+            navigate(`/chat/${appt.id}`)
+        */}
+        <Route
+          path="/chat/:roomId"
+          element={<ProtectedRoute><Chat /></ProtectedRoute>}
+        />
+
+        {/*
+          Video call has TWO routes:
+          1. /video-call/:appointmentId  — launched from an appointment card (auto-connects)
+          2. /video-call                 — manual fallback (shows peer ID copy/paste UI)
+        */}
+        <Route
+          path="/video-call/:appointmentId"
+          element={<ProtectedRoute><VideoCallComponent /></ProtectedRoute>}
+        />
+        <Route
+          path="/video-call"
+          element={<ProtectedRoute><VideoCallComponent /></ProtectedRoute>}
+        />
+
+      </Routes>
+    </BrowserRouter>
   );
 }

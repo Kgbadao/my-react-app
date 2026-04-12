@@ -7,6 +7,18 @@ import {
   TrendingUp, LogOut
 } from 'lucide-react';
 
+const DOCTOR_MAP = {
+  doc1: 'Dr. Sarah Smith',
+  doc2: 'Dr. Michael Johnson',
+  doc3: 'Dr. Emily Lee',
+  doc4: 'Dr. James Wilson',
+};
+
+const getDoctorName = (doctorId) => {
+  if (!doctorId) return 'Unknown Doctor';
+  return DOCTOR_MAP[doctorId] || doctorId;
+};
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
 
 export default function Dashboard() {
