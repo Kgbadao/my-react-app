@@ -71,7 +71,7 @@ function LoginPage() {
     setLoading(true);
     try {
       // CHANGED: Use API_URL instead of localhost
-      const res = await fetch(`${API_URL}/auth/google`, {
+      const res = await fetch(`${API_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

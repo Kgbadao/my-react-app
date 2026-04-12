@@ -31,7 +31,7 @@ export default function RegisterPage() {
       return;
     }
 
-    fetch(`${API_URL}/auth/google`, {
+    fetch(`${API_URL}/api/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
