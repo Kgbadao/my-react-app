@@ -669,8 +669,8 @@ app.get('/api/appointments', verifyToken, async (req, res) => {
     const userId = req.user.uid;
 
     const [asPatient, asDoctor] = await Promise.all([
-      db.collection('appointments').where('patientId', '==', userId).orderBy('createdAt', 'desc').get(),
-      db.collection('appointments').where('doctorId',  '==', userId).orderBy('createdAt', 'desc').get(),
+      db.collection('appointments').where('patientId', '==', userId).get(),
+      db.collection('appointments').where('doctorId',  '==', userId).get(),
     ]);
 
     const seen = new Set();

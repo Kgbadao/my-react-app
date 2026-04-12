@@ -308,7 +308,7 @@ export default function Dashboard() {
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Doctor</p>
-                            <p className="font-semibold text-gray-800">{appt.doctorId}</p>
+                            <p className="font-semibold text-gray-800">{getDoctorName(appt.doctorId)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-gray-600">
