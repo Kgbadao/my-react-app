@@ -27,7 +27,7 @@ function Navbar() {
   const publicLinks = [
     { to: "/", label: "Home", icon: Home },
     { to: "/about", label: "About", icon: Info },
-    { to: "/doctor-registration", label: "DoctorRegistration", icon: Stethoscope },
+    { to: "/doctorregistration", label: "DoctorRegistration", icon: Stethoscope },
   ];
 
   // Links only shown when logged in
