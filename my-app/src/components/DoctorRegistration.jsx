@@ -100,17 +100,25 @@ const DoctorRegistration = () => {
     try {
       setLoading(true);
 
-      // Generate unique filename with timestamp
+      // NEW: Create the user in Firebase Auth FIRST
+      // This makes 'request.auth' valid for your Storage Rules
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Generate unique filename
       const timestamp = Date.now();
       const fileExtension = file.name.split(".").pop();
-      const uniqueFileName = `${email}_${timestamp}.${fileExtension}`;
+      const uniqueFileName = `${user.uid}_${timestamp}.${fileExtension}`; // Use UID for better security
       
       const fileRef = ref(storage, `licenses/${uniqueFileName}`);
+      
+      // Now this will succeed because the user is authenticated!
       await uploadBytes(fileRef, file);
       const fileURL = await getDownloadURL(fileRef);
 
-      // Store doctor data in Firestore
+      // Store doctor data in Firestore using the Auth UID
       await addDoc(collection(db, "doctors"), {
+        uid: user.uid, // Link the auth user to the database record
         name: name.trim(),
         email: email.trim().toLowerCase(),
         specialization: specialization.trim(),
@@ -120,10 +128,6 @@ const DoctorRegistration = () => {
         registeredAt: new Date().toISOString(),
         status: "pending",
       });
-
-      // Note: In production, you should use Firebase Authentication
-      // to create the user account with the password
-      // For now, password is not stored (security best practice)
 
       setSuccess(true);
       
