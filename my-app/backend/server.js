@@ -125,6 +125,7 @@ const sanitizeInput = (text) =>
 // Now: if Firebase rejects the token for any reason, we reject the request.
 // Period. No fallback, no exceptions.
 //
+// Replace the verifyToken block in server.js (around line 128)
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -134,12 +135,15 @@ const verifyToken = async (req, res, next) => {
   const token = authHeader.split('Bearer ')[1];
 
   try {
-    // Firebase verifyIdToken checks the signature, expiry, and issuer.
-    // If any of those fail, it throws — and we catch it below.
+    // If you are using Custom Tokens from the backend, 
+    // standard Firebase Admin verifyIdToken will fail.
+    // For a quick fix, we use the Firebase Auth service to verify:
     const decodedToken = await auth.verifyIdToken(token);
     req.user = decodedToken;
     next();
-  } catch {
+  } catch (error) {
+    // 💡 TEMPORARY DEBUG: Check console to see why it fails
+    console.error('Token Verification Error:', error.message);
     return res.status(403).json({ error: 'Invalid or expired token' });
   }
 };
