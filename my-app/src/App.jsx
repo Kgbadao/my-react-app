@@ -17,11 +17,11 @@ import ContactPage from './pages/ContactPage';      // updated ContactPage
 import LoginPage from './pages/LoginPage';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
-import AppointmentForm from './pages/AppointmentForm';
-import Chat from './pages/Chat';
-import VideoCallComponent from './pages/VideoCallComponent'; // updated VideoCall
+import AppointmentForm from './components/AppointmentForm';
+import Chat from './components/Chat';
+import VideoCallComponent from './components/VideoCallComponent'; // updated VideoCall
 import Profile from './pages/Profile';              // updated Profile
-import DoctorRegistration from './pages/DoctorRegistration';
+import DoctorRegistration from './components/DoctorRegistration';
 
 export default function App() {
   return (
