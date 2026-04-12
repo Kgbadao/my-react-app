@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { AlertCircle, Loader, UserPlus } from 'lucide-react';
-import { auth } from '../firebase'; // Ensure this path is correct
+import { auth } from '../firebaseConfig'; // Ensure this path is correct
 import { signInWithCustomToken } from "firebase/auth";
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
