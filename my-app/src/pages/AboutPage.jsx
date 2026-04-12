@@ -11,21 +11,20 @@ import {
   Video,
   Lock,
   TrendingUp,
-  Star
 } from 'lucide-react';
 
 export default function AboutPage() {
   const features = [
     {
       icon: Shield,
-      title: 'HIPAA Compliant',
+      title: 'Privacy First',
       description: 'End-to-end encrypted communications ensure your medical information stays completely private and secure.',
       color: 'bg-blue-100 text-blue-600'
     },
     {
       icon: Users,
-      title: 'Expert Doctors',
-      description: 'Connect with board-certified physicians and licensed healthcare professionals across all specialties.',
+      title: 'Qualified Doctors',
+      description: 'Connect with licensed healthcare professionals across multiple specialties, all verified before joining the platform.',
       color: 'bg-purple-100 text-purple-600'
     },
     {
@@ -43,10 +42,10 @@ export default function AboutPage() {
   ];
 
   const stats = [
-    { number: '50K+', label: 'Patients Served', icon: Users },
-    { number: '500+', label: 'Healthcare Providers', icon: Stethoscope },
-    { number: '98%', label: 'Satisfaction Rate', icon: Star },
-    { number: '24/7', label: 'Support Available', icon: Clock }
+    { number: '4', label: 'Specialist Doctors', icon: Stethoscope },
+    { number: '4', label: 'Medical Specialties', icon: Users },
+    { number: '100%', label: 'Secure & Encrypted', icon: Shield },
+    { number: '24/7', label: 'Platform Available', icon: Clock }
   ];
 
   const values = [
@@ -111,7 +110,7 @@ export default function AboutPage() {
             Healthcare Without Boundaries
           </h1>
           <p className="text-xl text-indigo-100 max-w-3xl mx-auto leading-relaxed">
-            We're revolutionizing healthcare by connecting patients with licensed medical professionals through secure, convenient, and accessible telemedicine services.
+            TeleMed is a telemedicine platform built to make it easier to connect with healthcare professionals — securely, from anywhere, at a time that works for you.
           </p>
         </div>
       </section>
@@ -216,15 +215,15 @@ export default function AboutPage() {
             Ready to Experience Better Healthcare?
           </h2>
           <p className="text-xl text-indigo-100 mb-8">
-            Join thousands of patients who trust TeleMed for their healthcare needs.
+            Get started today and experience healthcare that works around your life, not the other way around.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="bg-white text-indigo-600 px-8 py-4 rounded-xl font-semibold hover:bg-indigo-50 transition shadow-lg hover:shadow-xl transform hover:scale-105">
+            <a href="/register" className="bg-white text-indigo-600 px-8 py-4 rounded-xl font-semibold hover:bg-indigo-50 transition shadow-lg hover:shadow-xl transform hover:scale-105 inline-block">
               Get Started Today
-            </button>
-            <button className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-xl font-semibold hover:bg-white hover:text-indigo-600 transition">
+            </a>
+            <a href="/contact" className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-xl font-semibold hover:bg-white hover:text-indigo-600 transition inline-block">
               Contact Us
-            </button>
+            </a>
           </div>
         </div>
       </section>
@@ -234,7 +233,7 @@ export default function AboutPage() {
           <div className="flex flex-wrap justify-center items-center gap-8 text-gray-500">
             <div className="flex items-center gap-2">
               <Shield className="w-5 h-5" />
-              <span className="text-sm font-medium">HIPAA Certified</span>
+              <span className="text-sm font-medium">End-to-End Encrypted</span>
             </div>
             <div className="flex items-center gap-2">
               <Lock className="w-5 h-5" />
@@ -242,11 +241,11 @@ export default function AboutPage() {
             </div>
             <div className="flex items-center gap-2">
               <Award className="w-5 h-5" />
-              <span className="text-sm font-medium">ISO Compliant</span>
+              <span className="text-sm font-medium">Verified Doctors</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5" />
-              <span className="text-sm font-medium">Verified Doctors</span>
+              <span className="text-sm font-medium">Secure Platform</span>
           
             </div>
           </div>
