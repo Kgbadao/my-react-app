@@ -642,22 +642,23 @@ app.get('/api/chat/:roomId/search', verifyToken, async (req, res) => {
 // DOCTOR ROUTES
 // ========================================
 
-// Returns all verified doctors with real Firestore UIDs as id.
-// Fixes the doc1/doc2 hardcoded ID problem in AppointmentForm.
+// Returns active doctors with real Firestore UIDs - fixes doc1/doc2 hardcoded IDs.
 app.get('/api/doctors', verifyToken, async (req, res) => {
   try {
-    const snapshot = await db.collection('users').where('role', '==', 'doctor').get();
+    const snapshot = await db.collection('users')
+      .where('role', '==', 'doctor')
+      .where('status', '==', 'active')
+      .get();
     const doctors = snapshot.docs.map((doc) => {
-      const { password: _pw, ...safe } = doc.data();
+      const { password: _pw, licenseURL: _l, ...safe } = doc.data();
       return {
-        id:           doc.id,
-        name:         safe.name           || 'Unknown',
-        specialty:    safe.specialization || 'General Practice',
-        experience:   safe.experience     || '',
-        location:     safe.location       || '',
-        rating:       safe.rating         || null,
-        picture:      safe.picture        || null,
-        status:       safe.status         || 'active',
+        id:         doc.id,
+        name:       safe.name           || 'Unknown',
+        specialty:  safe.specialization || 'General Practice',
+        experience: safe.experience     || '',
+        location:   safe.location       || '',
+        rating:     safe.rating         || null,
+        picture:    safe.picture        || null,
       };
     });
     res.status(200).json(doctors);
@@ -668,10 +669,9 @@ app.get('/api/doctors', verifyToken, async (req, res) => {
 });
 
 // POST /api/doctor/register  (multipart/form-data)
-// Handles doctor registration in one request:
-//   1. Uploads license via Admin SDK - bypasses Firebase Storage rules entirely
-//   2. Creates user document with status: pending
-// Replaces the broken client-SDK upload in the old DoctorRegistration.jsx.
+// Uploads license via Admin SDK so Firebase Storage rules are bypassed entirely.
+// Uses getSignedUrl NOT makePublic - makePublic fails when uniform bucket-level
+// access is enabled (which is the default on Firebase Storage buckets).
 app.post('/api/doctor/register', authLimiter, upload.single('licenseFile'), async (req, res) => {
   try {
     const { name, email, password, specialization, licenseNumber } = req.body;
@@ -695,7 +695,7 @@ app.post('/api/doctor/register', authLimiter, upload.single('licenseFile'), asyn
     }
 
     // Upload via Admin SDK - no Storage rules apply
-    const safeFileName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeFileName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = `licenses/${Date.now()}_${safeFileName}`;
     const fileRef = bucket.file(filePath);
 
@@ -705,8 +705,12 @@ app.post('/api/doctor/register', authLimiter, upload.single('licenseFile'), asyn
         metadata: { uploadedBy: email },
       },
     });
-    await fileRef.makePublic();
-    const licenseURL = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+
+    // Signed URL valid 1 year - same pattern as chat upload route
+    const [licenseURL] = await fileRef.getSignedUrl({
+      action:  'read',
+      expires: Date.now() + 365 * 24 * 60 * 60 * 1000,
+    });
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const newUser = {
