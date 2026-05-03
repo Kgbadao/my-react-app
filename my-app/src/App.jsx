@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'; // 👈 REMOVED BrowserRouter from here
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
@@ -71,6 +72,7 @@ export default function App() {
 
         </Routes>
       </div>
+      <Footer />
       {/* ❌ NO </BrowserRouter> TAG HERE */}
     </div>
   );

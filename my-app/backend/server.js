@@ -351,7 +351,15 @@ io.on('connection', (socket) => {
 
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const {
+      name,
+      email,
+      password,
+      role = 'patient',
+      specialization,
+      licenseNumber,
+      licenseURL,
+    } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'All fields are required' });
@@ -361,6 +369,16 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ message: 'Invalid email format' });
+    }
+    if (!['patient', 'doctor'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+    if (role === 'doctor') {
+      if (!specialization || !licenseNumber || !licenseURL) {
+        return res.status(400).json({
+          message: 'specialization, licenseNumber, and licenseURL are required for doctors',
+        });
+      }
     }
 
     const existing = await db.collection('users').where('email', '==', email).get();
@@ -374,13 +392,19 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       email,
       password:  hashedPassword,
       provider:  'email',
-      role:      'patient',
+      role,
       createdAt: new Date().toISOString(),
     };
+    if (role === 'doctor') {
+      newUser.specialization = sanitizeInput(specialization);
+      newUser.licenseNumber = sanitizeInput(licenseNumber);
+      newUser.licenseURL = sanitizeInput(licenseURL);
+      newUser.status = 'pending';
+    }
 
     const docRef = await db.collection('users').add(newUser);
 
-    const token = signToken({ uid: docRef.id, email, name: newUser.name, role: 'patient' });
+    const token = signToken({ uid: docRef.id, email, name: newUser.name, role });
 
     res.status(201).json({
       message: 'Registration successful',
@@ -388,7 +412,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       token,
       name:    newUser.name,
       email,
-      role:    'patient',
+      role,
     });
   } catch (error) {
     console.error('Registration error:', error);

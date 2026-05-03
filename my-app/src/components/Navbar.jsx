@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Menu, X, Video, MessageCircle, Calendar, Home, Info, Stethoscope, LogOut, User, ChevronDown } from "lucide-react";
+import { Menu, X, Video, MessageCircle, Calendar, Home, Info, LogOut } from "lucide-react";
 
 function Navbar() {
   const location = useLocation();
@@ -27,7 +27,6 @@ function Navbar() {
   const publicLinks = [
     { to: "/", label: "Home", icon: Home },
     { to: "/about", label: "About", icon: Info },
-    { to: "/doctorregistration", label: "DoctorRegistration", icon: Stethoscope },
   ];
 
   // Links only shown when logged in
