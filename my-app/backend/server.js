@@ -670,8 +670,8 @@ app.get('/api/doctors', verifyToken, async (req, res) => {
 
 // POST /api/doctor/register  (multipart/form-data)
 // Uploads license via Admin SDK so Firebase Storage rules are bypassed entirely.
-// Uses getSignedUrl NOT makePublic - makePublic fails when uniform bucket-level
-// access is enabled (which is the default on Firebase Storage buckets).
+// Uses getSignedUrl (v4) NOT makePublic - makePublic fails when uniform bucket-level
+// access is enabled. V4 read URLs must expire within 7 days.
 app.post('/api/doctor/register', authLimiter, (req, res, next) => {
   upload.single('licenseFile')(req, res, (err) => {
     if (!err) return next();
@@ -719,10 +719,13 @@ app.post('/api/doctor/register', authLimiter, (req, res, next) => {
       },
     });
 
-    // Signed URL valid 1 year - same pattern as chat upload route
+    // V4 signed URLs may not expire more than 7 days in the future (604800s).
+    // A 365-day expiry throws from the signer and surfaced as 500 — match chat upload.
+    const licenseUrlTtlMs = 7 * 24 * 60 * 60 * 1000;
     const [licenseURL] = await fileRef.getSignedUrl({
+      version: 'v4',
       action:  'read',
-      expires: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      expires: Date.now() + licenseUrlTtlMs,
     });
 
     const hashedPassword = await bcrypt.hash(password, 12);
