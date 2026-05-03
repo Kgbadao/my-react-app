@@ -672,7 +672,20 @@ app.get('/api/doctors', verifyToken, async (req, res) => {
 // Uploads license via Admin SDK so Firebase Storage rules are bypassed entirely.
 // Uses getSignedUrl NOT makePublic - makePublic fails when uniform bucket-level
 // access is enabled (which is the default on Firebase Storage buckets).
-app.post('/api/doctor/register', authLimiter, upload.single('licenseFile'), async (req, res) => {
+app.post('/api/doctor/register', authLimiter, (req, res, next) => {
+  upload.single('licenseFile')(req, res, (err) => {
+    if (!err) return next();
+
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: 'License file must be under 10MB' });
+      }
+      return res.status(400).json({ message: `Upload error: ${err.message}` });
+    }
+
+    return res.status(400).json({ message: err.message || 'Invalid file upload' });
+  });
+}, async (req, res) => {
   try {
     const { name, email, password, specialization, licenseNumber } = req.body;
 
