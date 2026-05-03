@@ -639,6 +639,108 @@ app.get('/api/chat/:roomId/search', verifyToken, async (req, res) => {
 });
 
 // ========================================
+// DOCTOR ROUTES
+// ========================================
+
+// Returns all verified doctors with real Firestore UIDs as id.
+// Fixes the doc1/doc2 hardcoded ID problem in AppointmentForm.
+app.get('/api/doctors', verifyToken, async (req, res) => {
+  try {
+    const snapshot = await db.collection('users').where('role', '==', 'doctor').get();
+    const doctors = snapshot.docs.map((doc) => {
+      const { password: _pw, ...safe } = doc.data();
+      return {
+        id:           doc.id,
+        name:         safe.name           || 'Unknown',
+        specialty:    safe.specialization || 'General Practice',
+        experience:   safe.experience     || '',
+        location:     safe.location       || '',
+        rating:       safe.rating         || null,
+        picture:      safe.picture        || null,
+        status:       safe.status         || 'active',
+      };
+    });
+    res.status(200).json(doctors);
+  } catch (error) {
+    console.error('GET /api/doctors error:', error);
+    res.status(500).json({ error: 'Failed to fetch doctors' });
+  }
+});
+
+// POST /api/doctor/register  (multipart/form-data)
+// Handles doctor registration in one request:
+//   1. Uploads license via Admin SDK - bypasses Firebase Storage rules entirely
+//   2. Creates user document with status: pending
+// Replaces the broken client-SDK upload in the old DoctorRegistration.jsx.
+app.post('/api/doctor/register', authLimiter, upload.single('licenseFile'), async (req, res) => {
+  try {
+    const { name, email, password, specialization, licenseNumber } = req.body;
+
+    if (!name || !email || !password || !specialization || !licenseNumber) {
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'Medical license file is required' });
+    }
+
+    const existing = await db.collection('users').where('email', '==', email).get();
+    if (!existing.empty) {
+      return res.status(409).json({ message: 'An account with this email already exists' });
+    }
+
+    // Upload via Admin SDK - no Storage rules apply
+    const safeFileName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `licenses/${Date.now()}_${safeFileName}`;
+    const fileRef = bucket.file(filePath);
+
+    await fileRef.save(req.file.buffer, {
+      metadata: {
+        contentType: req.file.mimetype,
+        metadata: { uploadedBy: email },
+      },
+    });
+    await fileRef.makePublic();
+    const licenseURL = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const newUser = {
+      name:           sanitizeInput(name),
+      email,
+      password:       hashedPassword,
+      provider:       'email',
+      role:           'doctor',
+      specialization: sanitizeInput(specialization),
+      licenseNumber:  sanitizeInput(licenseNumber),
+      licenseURL,
+      status:         'pending',
+      createdAt:      new Date().toISOString(),
+    };
+
+    const docRef = await db.collection('users').add(newUser);
+    const token = signToken({ uid: docRef.id, email, name: newUser.name, role: 'doctor' });
+
+    res.status(201).json({
+      message: 'Registration submitted. Your credentials are under review.',
+      userId:  docRef.id,
+      token,
+      name:    newUser.name,
+      email,
+      role:    'doctor',
+      status:  'pending',
+    });
+  } catch (error) {
+    console.error('Doctor registration error:', error);
+    res.status(500).json({ message: 'Server error during registration' });
+  }
+});
+
+// ========================================
 // 🗓️ APPOINTMENT ROUTES
 // ========================================
 

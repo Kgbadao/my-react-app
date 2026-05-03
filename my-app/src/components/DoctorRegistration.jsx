@@ -1,102 +1,187 @@
 import React, { useState } from 'react';
-import { storage } from '../firebaseConfig';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNavigate } from 'react-router-dom';
+
+// NOTE: All Firebase Storage imports removed.
+// License file is sent to POST /api/doctor/register as multipart/form-data.
+// Server uploads it via Admin SDK — bypasses Firebase Storage rules entirely.
+// This fixes the "storage/unauthorized" error caused by JWT users not being
+// signed into Firebase client auth.
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
+
+const SPECIALIZATIONS = [
+  'General Practice', 'Cardiology', 'Pediatrics', 'Mental Health',
+  'Dermatology', 'Orthopedics', 'Gynecology', 'Neurology', 'Family Medicine', 'Other',
+];
 
 const DoctorRegistration = () => {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    specialization: '',
-    licenseNumber: '',
+    name: '', email: '', password: '', specialization: '', licenseNumber: '',
   });
   const [file, setFile] = useState(null);
+  const [fileName, setFileName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState('');
   const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (!selected) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowed.includes(selected.type)) {
+      setError('Only PDF, JPG, or PNG files are accepted.'); return;
+    }
+    if (selected.size > 10 * 1024 * 1024) {
+      setError('File must be under 10MB.'); return;
+    }
+    setError('');
+    setFile(selected);
+    setFileName(selected.name);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    if (!file) { setError('Please upload your medical license document.'); return; }
+
+    setLoading(true);
+    setUploadProgress('Uploading license document...');
 
     try {
-      // 1. Upload License to Firebase Storage[cite: 3]
-      if (!file) throw new Error("Please upload your medical license.");
-      
-      const storageRef = ref(storage, `licenses/${Date.now()}_${file.name}`);
-      const uploadTask = await uploadBytes(storageRef, file);
-      const licenseURL = await getDownloadURL(uploadTask.ref);
+      // One multipart/form-data request — server handles storage + user creation
+      const body = new FormData();
+      body.append('name',           formData.name);
+      body.append('email',          formData.email);
+      body.append('password',       formData.password);
+      body.append('specialization', formData.specialization);
+      body.append('licenseNumber',  formData.licenseNumber);
+      body.append('licenseFile',    file); // matches upload.single('licenseFile') on server
 
-      // 2. Register via Backend API
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register`, {
+      setUploadProgress('Submitting registration...');
+
+      const response = await fetch(`${API_URL}/api/doctor/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          role: 'doctor',
-          licenseURL,
-        }),
+        // Do NOT set Content-Type — browser sets it with the correct boundary
+        body,
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Registration failed');
 
-      if (!response.ok) throw new Error(data.message || "Registration failed");
-
-      // 3. Success - Store token and redirect[cite: 1, 11]
       localStorage.setItem('authToken', data.token);
-      localStorage.setItem('user', JSON.stringify({ 
-        name: formData.name, 
-        role: 'doctor', 
-        status: 'pending' 
+      localStorage.setItem('user', JSON.stringify({
+        id: data.userId, name: data.name, email: data.email,
+        role: 'doctor', status: 'pending',
       }));
-      
-      alert("Registration submitted! Your credentials are being verified.");
-      navigate('/dashboard');
+
+      navigate('/dashboard', {
+        state: { notice: 'Registration submitted! Your credentials are being verified. You will have full access once approved.' }
+      });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
+      setUploadProgress('');
     }
   };
 
   return (
-    <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-lg shadow-xl">
-      <h2 className="text-2xl font-bold mb-6 text-center">Doctor Registration</h2>
-      
-      {error && <p className="bg-red-100 text-red-600 p-3 rounded mb-4">{error}</p>}
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-8">
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input name="name" placeholder="Full Name" onChange={handleChange} required className="w-full p-2 border rounded" />
-        <input name="email" type="email" placeholder="Email" onChange={handleChange} required className="w-full p-2 border rounded" />
-        <input name="password" type="password" placeholder="Password (min 6 chars)" onChange={handleChange} required className="w-full p-2 border rounded" />
-        <input name="specialization" placeholder="Specialization (e.g. Cardiologist)" onChange={handleChange} required className="w-full p-2 border rounded" />
-        <input name="licenseNumber" placeholder="Medical License Number" onChange={handleChange} required className="w-full p-2 border rounded" />
-        
-        <div className="border-2 border-dashed p-4 text-center">
-          <label className="block mb-2 text-sm font-medium">Upload Medical License (PDF/JPG)</label>
-          <input type="file" onChange={(e) => setFile(e.target.files[0])} required className="text-sm" />
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-gray-800">Doctor Registration</h2>
+          <p className="text-gray-500 text-sm mt-2">
+            Submit your details for verification. You'll be approved within 1–2 business days.
+          </p>
         </div>
 
-        <button 
-          type="submit" 
-          disabled={loading}
-          className="w-full bg-blue-600 text-white p-3 rounded hover:bg-blue-700 disabled:bg-blue-300"
-        >
-          {loading ? 'Processing...' : 'Register as Doctor'}
-        </button>
-
-        {loading && (
-          <p className="text-xs text-gray-500 text-center animate-pulse mt-2">
-            Securely uploading documents. Please don't refresh...
-          </p>
+        {error && (
+          <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            {error}
+          </div>
         )}
-      </form>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+            <input name="name" type="text" placeholder="Dr. Jane Smith" value={formData.name}
+              onChange={handleChange} required disabled={loading}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <input name="email" type="email" placeholder="doctor@hospital.com" value={formData.email}
+              onChange={handleChange} required disabled={loading}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input name="password" type="password" placeholder="At least 6 characters" value={formData.password}
+              onChange={handleChange} required minLength={6} disabled={loading}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Specialization</label>
+            <select name="specialization" value={formData.specialization} onChange={handleChange}
+              required disabled={loading}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition bg-white">
+              <option value="">Select your specialty...</option>
+              {SPECIALIZATIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Medical License Number</label>
+            <input name="licenseNumber" type="text" placeholder="e.g. MED-12345678" value={formData.licenseNumber}
+              onChange={handleChange} required disabled={loading}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Medical License Document <span className="text-gray-400 font-normal">(PDF, JPG, PNG — max 10MB)</span>
+            </label>
+            <label className={`flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl p-6 cursor-pointer transition
+              ${fileName ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50'}`}>
+              {fileName ? (
+                <>
+                  <span className="text-indigo-600 font-medium text-sm">{fileName}</span>
+                  <span className="text-gray-400 text-xs mt-1">Click to replace</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-gray-500 text-sm">Click to upload your license document</span>
+                  <span className="text-gray-400 text-xs mt-1">PDF, JPG, or PNG accepted</span>
+                </>
+              )}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFileChange} disabled={loading} className="hidden" />
+            </label>
+          </div>
+
+          <button type="submit" disabled={loading}
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+            {loading ? (uploadProgress || 'Processing...') : 'Register as Doctor'}
+          </button>
+
+          {loading && (
+            <p className="text-xs text-gray-400 text-center animate-pulse">
+              Please don't close or refresh this page...
+            </p>
+          )}
+
+          <p className="text-center text-sm text-gray-500">
+            Already have an account?{' '}
+            <a href="/login" className="text-indigo-600 hover:underline font-medium">Log in</a>
+          </p>
+        </form>
+      </div>
     </div>
   );
 };
