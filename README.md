@@ -2,9 +2,6 @@ CopyTeleMed — Telemedicine Web Platform
 
 A full-stack telemedicine platform connecting patients with healthcare providers through video consultations, secure messaging, and appointment scheduling. Built solo as a complete, working product — not a prototype.
 
-Live demo: [link]
-Demo video: [link]
-
 What It Does
 
 TeleMed gives patients a complete path from finding a doctor to having a consultation:
