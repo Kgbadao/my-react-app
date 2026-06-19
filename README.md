@@ -2,8 +2,7 @@
 
 A full-stack telemedicine platform connecting patients with healthcare providers through video consultations, secure messaging, and appointment scheduling. Built solo as a complete, working product — not a prototype.
 
-**Live demo:** https://my-react-app-psi-kohl.vercel.app
-
+**Live demo:** https://my-react-app-n8v7.vercel.app/
 ## What It Does
 
 TeleMed gives patients a complete path from finding a doctor to having a consultation:
