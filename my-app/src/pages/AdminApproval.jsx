@@ -3,7 +3,7 @@ import axios from 'axios';
 import { CheckCircle, ExternalLink } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://telemed-seel.onrender.com';
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET;
+const ADMIN_SECRET = 'telemed-123'; // hardcoded — only you know this URL
 
 export default function AdminApproval() {
   const [doctors, setDoctors] = useState([]);
@@ -13,7 +13,7 @@ export default function AdminApproval() {
 
   const fetchPending = async () => {
     const res = await axios.get(`${API_URL}/api/admin/pending-doctors`, {
-      headers: { 'x-admin-secret': ADMIN_SECRET }
+      headers: { 'x-admin-secret': ADMIN_SECRET }  // ← first place
     });
     setDoctors(res.data);
     setLoading(false);
@@ -23,7 +23,7 @@ export default function AdminApproval() {
 
   const approve = async (userId) => {
     await axios.post(`${API_URL}/api/admin/approve-doctor/${userId}`, {}, {
-      headers: { 'x-admin-secret': ADMIN_SECRET }
+      headers: { 'x-admin-secret': ADMIN_SECRET }  // ← second place
     });
     setDoctors(doctors.filter(d => d.id !== userId));
   };
