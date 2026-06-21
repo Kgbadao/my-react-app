@@ -454,6 +454,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       name:    userData.name,
       email:   userData.email,
       role:    userData.role || 'patient',
+      status:  userData.status || 'active',
       token,
     });
   } catch (error) {
@@ -490,7 +491,7 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
     }
 
     const jwtToken = signToken({ uid: userId, email, name, role });
-
+    const userStatus = snapshot.empty ? 'active' : (snapshot.docs[0].data().status || 'active');
     res.status(200).json({ message: 'Google user authenticated', name, email, userId, role, token: jwtToken });
   } catch (err) {
     console.error('Google Auth error:', err);
@@ -757,6 +758,41 @@ app.post('/api/doctor/register', authLimiter, (req, res, next) => {
   } catch (error) {
     console.error('Doctor registration error:', error);
     res.status(500).json({ message: 'Server error during registration' });
+  }
+});
+
+// Admin middleware
+const verifyAdmin = (req, res, next) => {
+  if (req.headers['x-admin-secret'] !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+};
+
+// GET pending doctors
+app.get('/api/admin/pending-doctors', verifyAdmin, async (req, res) => {
+  try {
+    const snapshot = await db.collection('users')
+      .where('role', '==', 'doctor')
+      .where('status', '==', 'pending')
+      .get();
+    const doctors = snapshot.docs.map(doc => {
+      const { password: _pw, ...safe } = doc.data();
+      return { id: doc.id, ...safe };
+    });
+    res.json(doctors);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch pending doctors' });
+  }
+});
+
+// POST approve doctor
+app.post('/api/admin/approve-doctor/:userId', verifyAdmin, async (req, res) => {
+  try {
+    await db.collection('users').doc(req.params.userId).update({ status: 'active' });
+    res.json({ message: 'Doctor approved' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to approve doctor' });
   }
 });
 

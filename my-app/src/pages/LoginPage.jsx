@@ -38,9 +38,16 @@ function LoginPage() {
           email:    data.email,
           role:     data.role || 'patient',
           provider: 'email',
+          status: data.status,
         }));
 
-        window.location.href = '/dashboard';
+       if (data.role === 'doctor' && data.status === 'pending') {
+  window.location.href = '/pending';
+} else if (data.role === 'doctor' && data.status === 'active') {
+  window.location.href = '/doctor-dashboard';
+} else {
+  window.location.href = '/dashboard';
+}
       } else {
         setError(data.message || 'Authentication failed');
       }
@@ -80,7 +87,13 @@ function LoginPage() {
           provider: 'google',
         }));
 
-        window.location.href = '/dashboard';
+        if (data.role === 'doctor' && data.status === 'pending') {
+           window.location.href = '/pending';
+           } else if (data.role === 'doctor' && data.status === 'active') {
+           window.location.href = '/doctor-dashboard';
+           } else {
+           window.location.href = '/dashboard';
+           }
       } else {
         setError(data.message || 'Google login failed');
       }

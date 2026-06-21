@@ -77,9 +77,8 @@ const DoctorRegistration = () => {
         role: 'doctor', status: 'pending',
       }));
 
-      navigate('/dashboard', {
-        state: { notice: 'Registration submitted! Your credentials are being verified. You will have full access once approved.' }
-      });
+      navigate('/pending'); 
+      
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {

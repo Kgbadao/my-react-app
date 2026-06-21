@@ -16,6 +16,9 @@ import Chat from './components/Chat';
 import VideoCallComponent from './components/VideoCallComponent';
 import Profile from './pages/Profile';
 import DoctorRegistration from './components/DoctorRegistration';
+import PendingApproval from './pages/PendingApproval';
+import AdminApproval from './pages/AdminApproval';
+import DoctorDashboard from './pages/DoctorDashboard';
 
 export default function App() {
   return (
@@ -33,6 +36,9 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<Register />} />
           <Route path="/doctorregistration" element={<DoctorRegistration />} />
+          <Route path="/pending" element={<PendingApproval />} />
+          <Route path="/admin/approvals" element={<AdminApproval />} />
+          
 
           {/* ─── Protected routes ─── */}
           <Route
@@ -62,6 +68,11 @@ export default function App() {
           <Route
             path="/video-call"
             element={<ProtectedRoute><VideoCallComponent /></ProtectedRoute>}
+          />
+
+          <Route
+            path="/doctor-dashboard"
+            element={<ProtectedRoute><DoctorDashboard /></ProtectedRoute>}
           />
 
           {/* ─── The Missing Notifications Route ─── */}
